@@ -1,0 +1,33 @@
+{
+  "name": "fruitfly-server",
+  "version": "1.0.0",
+  "description": "FruitFly monitoring platform backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "magnus-cpu"
+  },
+  "author": "magnus-cpu",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.3",
+    "moment": "^2.30.1",
+    "multer": "^2.0.2",
+    "mysql2": "^3.15.1",
+    "nodemon": "^3.1.10"
+  }
+}
