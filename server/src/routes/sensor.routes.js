@@ -2,10 +2,10 @@ import express from 'express';
 import { 
   getSensors, 
   getAllSensors,
-  createSensor, 
-  updateSensor, 
-  deleteSensor,
-  getSensorById
+  getSensorById,
+  createNode,
+  updateNode,
+  deleteNode
   } from '../controllers/sensor.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { validateSensor } from '../validators/validator.js';
@@ -18,9 +18,11 @@ router.use(authenticateToken);
 // Sensor routes
 router.get('/', getSensors);
 router.get('/admin', getAllSensors);
-router.post('/', validateSensor, createSensor);
 router.get('/:id', getSensorById);
-router.put('/:id', validateSensor, updateSensor);
-router.delete('/:id', deleteSensor);
+
+
+router.post('/', validateSensor, createNode);
+router.put('/:id', validateSensor, updateNode);
+router.delete('/:id', deleteNode);
 
 export default router;

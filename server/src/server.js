@@ -4,15 +4,19 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
-import sensorRoutes from './routes/sensor.routes.js';
-import sensorDataRoutes from './routes/sensorData.routes.js';
+import sensor from './routes/sensor.routes.js';
+import gateway from './routes/gateway.routes.js'
+import environmentalData from './routes/environmentalData.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import userRoutes from './routes/user.routes.js';
 import { initDB } from './config/database.js';
+import imageData from './routes/imageData.routes.js';
+import countsData from './routes/countsData.routes.js'
 
 dotenv.config();
 
 const app = express();
+const MAX_PAYLOAD_SIZE = '50mb';
 
 (async () => {
   await initDB(); // Run schema.sql on startup
@@ -39,9 +43,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: MAX_PAYLOAD_SIZE }));
+app.use(express.urlencoded({ extended: true, limit: MAX_PAYLOAD_SIZE }));
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -54,8 +59,11 @@ app.get('/api/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/sensors', sensorRoutes);
-app.use('/api/sensor-data', sensorDataRoutes);
+app.use('/api/sensors', sensor);
+app.use('/api/gateways', gateway)
+app.use('/api/fruitfly', environmentalData);
+app.use('/api/fruitfly', imageData);
+app.use('/api/fruitfly', countsData);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 

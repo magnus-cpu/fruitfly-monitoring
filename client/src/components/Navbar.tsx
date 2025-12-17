@@ -20,7 +20,8 @@ const Navbar: React.FC = () => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Map },
     { path: '/map', label: 'Map', icon: Map },
-    { path: '/sensors', label: 'Sensors', icon: BarChart3 },
+    { path: '/gateways', label: 'GateWays', icon: BarChart3 },
+    { path: '/sensors', label: 'Sensors/Node', icon: BarChart3 },
     { path: '/reports', label: 'Reports', icon: FileText },
 
   ];

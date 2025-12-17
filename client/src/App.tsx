@@ -10,6 +10,7 @@ import Reports from './pages/Reports';
 import Sensors from './pages/Sensors';
 import MapView from './pages/MapView';
 import Profile from './pages/Profile';
+import GateWays from './pages/gateways';
 
 function App() {
   return (
@@ -49,6 +50,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Sensors />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+            path="/gateways"
+              element={
+                <ProtectedRoute>
+                  <GateWays />
                 </ProtectedRoute>
               }
             />

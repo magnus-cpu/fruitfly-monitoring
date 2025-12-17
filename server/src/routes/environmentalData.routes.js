@@ -1,8 +1,8 @@
 import express from 'express';
 import { 
-  getSensorData,
-  addSensorData
-} from '../controllers/sensorData.controller.js';
+  getEnvironmentalData,
+  storeEnvironmentalData
+} from '../controllers/environmentalData.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { validateSensorData } from '../validators/validator.js';
 
@@ -12,7 +12,7 @@ const router = express.Router();
 // router.use(authenticateToken);
 
 // Sensor data routes
-router.get('/:id/data', authenticateToken,getSensorData);
-router.post('/data', validateSensorData, addSensorData);
+router.get('/:id/data', authenticateToken, getEnvironmentalData);
+router.post('/data', validateSensorData, storeEnvironmentalData);
 
 export default router;
