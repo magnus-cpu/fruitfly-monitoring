@@ -1,11 +1,11 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 
 export const storeCountsData = async (req, res) => {
     const { serial_number, fruitfly_count, time_taken } = req.body;
 
     // GET sensor id from serial_number
     try {
-        const [sensorRows] = await db.execute
+        const [sensorRows] = await pool.execute
             (
                 'SELECT id FROM sensors WHERE serial_number = ?',
                 [serial_number]
@@ -22,7 +22,7 @@ export const storeCountsData = async (req, res) => {
 
         // Insert into fruitfly_counts table  new data
 
-        const [result] = await db.execute(
+        const [result] = await pool.execute(
             'INSERT INTO fruitfly_counts (sensor_id, fruitfly_count, time_taken) VALUES (?, ?, ?)',
             [sensorId, fruitfly_count, time_taken]
         );

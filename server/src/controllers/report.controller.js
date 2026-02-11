@@ -1,10 +1,10 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { jsPDF } from 'jspdf';
 
 const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
   const params = [userId];
-  const [sensorRows] = await db.execute(
+  const [sensorRows] = await pool.execute(
     `
       SELECT s.id, s.name, s.location, s.status, s.gateway_id
       FROM sensors s
@@ -14,7 +14,7 @@ const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
     params
   );
 
-  const [gatewayRows] = await db.execute(
+  const [gatewayRows] = await pool.execute(
     `
       SELECT g.id, g.name, g.location, g.status
       FROM gateways g
@@ -24,7 +24,7 @@ const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
     [userId]
   );
 
-  const [envRows] = await db.execute(
+  const [envRows] = await pool.execute(
     `
       SELECT s.id AS sensor_id,
              COUNT(er.id) AS readings,
@@ -44,7 +44,7 @@ const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
     [dateStart, dateEnd, userId]
   );
 
-  const [flyRows] = await db.execute(
+  const [flyRows] = await pool.execute(
     `
       SELECT s.id AS sensor_id,
              COUNT(fc.id) AS samples,
@@ -112,7 +112,7 @@ const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
 // Get all reports for user
 export const getReports = async (req, res) => {
   try {
-    const [reports] = await db.execute(
+    const [reports] = await pool.execute(
       `SELECT id, report_type, date_range_start, date_range_end, file_path, created_at 
        FROM reports 
        WHERE user_id = ? 
@@ -156,7 +156,7 @@ export const generateReport = async (req, res) => {
     const fileName = `report_${Date.now()}_${report_type}.pdf`;
     const filePath = `/reports/${req.user.id}/${fileName}`;
 
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'INSERT INTO reports (user_id, report_type, date_range_start, date_range_end, file_path) VALUES (?, ?, ?, ?, ?)',
       [req.user.id, report_type, date_range_start, date_range_end, filePath]
     );
@@ -176,7 +176,7 @@ export const generateReport = async (req, res) => {
 // Download report
 export const downloadReport = async (req, res) => {
   try {
-    const [reports] = await db.execute(
+    const [reports] = await pool.execute(
       'SELECT * FROM reports WHERE id = ? AND user_id = ?',
       [req.params.id, req.user.id]
     );
@@ -470,7 +470,7 @@ export const downloadReport = async (req, res) => {
 
 export const getReportAvailability = async (req, res) => {
   try {
-    const [rows] = await db.execute(
+    const [rows] = await pool.execute(
       `
         SELECT
           MIN(dates.min_date) AS min_date,

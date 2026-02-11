@@ -1,4 +1,4 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 
 export const getContent = async (req, res) => {
   try {
@@ -21,7 +21,7 @@ export const getContent = async (req, res) => {
 
     query += ' ORDER BY page_key ASC, order_index ASC, id ASC';
 
-    const [rows] = await db.execute(query, params);
+    const [rows] = await pool.execute(query, params);
     res.json(rows);
   } catch (error) {
     console.error('Error fetching content blocks:', error);
@@ -33,7 +33,7 @@ export const upsertContent = async (req, res) => {
   try {
     const { page_key, section_key, title, body, style, order_index } = req.body;
 
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       `
         INSERT INTO content_blocks (page_key, section_key, title, body, style, order_index)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -65,7 +65,7 @@ export const upsertContent = async (req, res) => {
 
 export const deleteContent = async (req, res) => {
   try {
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'DELETE FROM content_blocks WHERE id = ?',
       [req.params.id]
     );

@@ -1,4 +1,4 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
 
 // To store environmental data 
@@ -15,7 +15,7 @@ export const storeEnvironmentalData = async (req, res) => {
     const { serial_number, temperature, humidity, time_taken } = req.body;
 
     // GET sensor id from serial_number
-    const [sensorRows] = await db.execute
+    const [sensorRows] = await pool.execute
       (
         'SELECT id FROM sensors WHERE serial_number = ?',
         [serial_number]
@@ -31,7 +31,7 @@ export const storeEnvironmentalData = async (req, res) => {
 
     const sensorId = sensorRows[0].id;
 
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'INSERT INTO environmental_readings (sensor_id, temperature, humidity, time_taken) VALUES (?, ?, ?, ?)',
       [sensorId, temperature, humidity, time_taken]
     );

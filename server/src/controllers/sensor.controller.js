@@ -1,4 +1,4 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
 
 
@@ -6,7 +6,7 @@ import { validationResult } from 'express-validator';
 const generateNodeSerial = async (gatewayId) => {
   try {
     // Get gateway serial number
-    const [gatewayRows] = await db.execute(
+    const [gatewayRows] = await pool.execute(
       'SELECT serial_number FROM gateways WHERE id = ?',
       [gatewayId]
     );
@@ -18,7 +18,7 @@ const generateNodeSerial = async (gatewayId) => {
     const gatewaySerial = gatewayRows[0].serial_number; // e.g., eFF-G-001
 
     // Get the last node number for this gateway
-    const [nodeRows] = await db.execute(
+    const [nodeRows] = await pool.execute(
       'SELECT serial_number FROM sensors WHERE gateway_id = ? ORDER BY id DESC LIMIT 1',
       [gatewayId]
     );
@@ -58,7 +58,7 @@ export const createNode = async (req, res) => {
     const { name, location, location_lat, location_lng, description } = req.body;
 
     // Verify gateway exists and belongs to user
-    const [gatewayRows] = await db.execute(
+    const [gatewayRows] = await pool.execute(
       'SELECT id FROM gateways WHERE id = ? AND user_id = ?',
       [gateway_id, req.user.id]
     );
@@ -73,7 +73,7 @@ export const createNode = async (req, res) => {
     // Generate serial number based on gateway
     const serial_number = await generateNodeSerial(gateway_id);
 
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'INSERT INTO sensors (name, serial_number, gateway_id, location, location_lat, location_lng, description, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [name, serial_number, gateway_id, location, location_lat, location_lng, description, req.user.id]
     );
@@ -118,7 +118,7 @@ export const updateNode = async (req, res) => {
 
     const { name, description, location, location_lat, location_lng } = req.body;
 
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'UPDATE sensors SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ? WHERE id = ? AND user_id = ?',
       [name, description, location, location_lat, location_lng, req.params.id, req.user.id]
     );
@@ -137,7 +137,7 @@ export const updateNode = async (req, res) => {
 // Delete node
 export const deleteNode = async (req, res) => {
   try {
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'DELETE FROM sensors WHERE id = ? AND user_id = ?',
       [req.params.id, req.user.id]
     );
@@ -158,7 +158,7 @@ export const deleteNode = async (req, res) => {
 // Get all sensors for authenticated user
 export const getSensors = async (req, res) => {
   try {
-    const [sensors] = await db.execute(
+    const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE user_id = ? ORDER BY created_at DESC',
       [req.user.id]
     );
@@ -173,7 +173,7 @@ export const getSensors = async (req, res) => {
 //  Get all sensors for authenticated user for that gateway
 export const getNodeSensors = async (req, res) => {
   try {
-    const [sensors] = await db.execute(
+    const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE user_id = ? AND gateway_id = ? ORDER BY created_at DESC',
       [req.user.id, req.params.id]
     );
@@ -188,7 +188,7 @@ export const getNodeSensors = async (req, res) => {
 //get all sensors for admin
 export const getAllSensors = async (req, res) => {
   try {
-    const [sensors] = await db.execute(
+    const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors ORDER BY created_at DESC'
     );
 
@@ -202,7 +202,7 @@ export const getAllSensors = async (req, res) => {
 // Get single sensor
 export const getSensorById = async (req, res) => {
   try {
-    const [sensors] = await db.execute(
+    const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE id = ? AND user_id = ?',
       [req.params.id, req.user.id]
     );

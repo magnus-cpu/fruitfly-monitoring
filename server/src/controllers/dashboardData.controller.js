@@ -1,4 +1,4 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 
 /* Get a union data of cordinates for 
  gateway-parrent and all of its nodes/childrens
@@ -30,7 +30,7 @@ export const getLocations = async (req, res) => {
       ORDER BY g.id;
     `;
 
-    const [rows] = await db.query(sql, [userId]);
+    const [rows] = await pool.query(sql, [userId]);
 
     const features = [];
     const gatewaySeen = new Set();

@@ -1,10 +1,10 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 
 // Get env data
 export const getEnvironmentalData = async (req, res) => {
   try {
     // GET sensor id from serial_number
-    const [sensorRows] = await db.execute
+    const [sensorRows] = await pool.execute
       (
         'SELECT id FROM sensors WHERE serial_number = ?',
         [req.params.serial_number]
@@ -20,7 +20,7 @@ export const getEnvironmentalData = async (req, res) => {
 
     const sensorId = sensorRows[0].id;
 
-    const [data] = await db.execute(
+    const [data] = await pool.execute(
       `SELECT id, temperature, humidity, time_taken, created_at 
        FROM environmental_readings 
        WHERE sensor_id = ? 
@@ -43,7 +43,7 @@ export const getCombinedData = async (req, res) => {
     const { serial_number } = req.params;
 
     // 1️⃣ Validate sensor ownership
-    const [sensors] = await db.execute(
+    const [sensors] = await pool.execute(
       'SELECT id FROM sensors WHERE serial_number = ? AND user_id = ?',
       [serial_number, userId]
     );
@@ -58,7 +58,7 @@ export const getCombinedData = async (req, res) => {
     const sensorId = sensors[0].id;
 
     // 2️⃣ Fetch last 5 environmental readings
-    const [envReadings] = await db.execute(
+    const [envReadings] = await pool.execute(
       `
       SELECT 
         id,
@@ -75,7 +75,7 @@ export const getCombinedData = async (req, res) => {
     );
 
     // 3️⃣ Fetch last 5 fruitfly counts
-    const [fruitflyCounts] = await db.execute(
+    const [fruitflyCounts] = await pool.execute(
       `
       SELECT
         id,

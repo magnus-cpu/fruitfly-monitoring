@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../config/database.js';
+import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
 
 // Register new user
@@ -18,7 +18,7 @@ export const register = async (req, res) => {
     const { username, email, password } = req.body;
 
     // Check if user already exists
-    const [existingUsers] = await db.execute(
+    const [existingUsers] = await pool.execute(
       'SELECT id FROM users WHERE email = ? OR username = ?',
       [email, username]
     );
@@ -34,7 +34,7 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Insert new user
-    const [result] = await db.execute(
+    const [result] = await pool.execute(
       'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
       [username, email, hashedPassword, 'user']
     );
@@ -86,7 +86,7 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const [users] = await db.execute(
+    const [users] = await pool.execute(
       'SELECT id, username, email, password, role, created_at FROM users WHERE email = ?',
       [email]
     );

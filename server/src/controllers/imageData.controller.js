@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import db from '../config/database.js';
+import pool from '../config/database.js';
 
 const OUTPUT_DIR = 'uploaded_images';
 
@@ -37,7 +37,7 @@ export const processImageData = async (req, res) => {
         writeFileSync(filePath, imageBuffer);
 
         // Check if sensor_id is registered in sensors table
-        const [sensorRows] = await db.execute(
+        const [sensorRows] = await pool.execute(
             'SELECT id FROM sensors WHERE serial_number = ?',
             [serial_number]
         );
@@ -52,14 +52,14 @@ export const processImageData = async (req, res) => {
          const sensorId = sensorRows[0].id;
 
         // Insert into fruitfly_images table
-        const [result] = await db.execute(
+        const [result] = await pool.execute(
             'INSERT INTO fruitfly_images (sensor_id, image_path, analysis_status, time_captured) VALUES (?, ?, ?, ?)',
             [sensorId, filePath, 'pending', date_time]
         );
 
 
        // Update image_id in fruitfly_counts table
-        await db.execute(
+        await pool.execute(
             'UPDATE fruitfly_counts SET image_id = ? WHERE sensor_id = ? AND time_taken = ? AND fruitfly_count = ?',
             [result.insertId, sensorId, date_time, counts]
         );

@@ -1,11 +1,11 @@
-import db from '../config/database.js';
+import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
 
 // Helper function to generate gateway serial number
 const generateGatewaySerial = async () => {
     try {
         // Get the last gateway serial number
-        const [rows] = await db.execute(
+        const [rows] = await pool.execute(
             'SELECT serial_number FROM gateways ORDER BY id DESC LIMIT 1'
         );
 
@@ -45,7 +45,7 @@ export const createGateWay = async (req, res) => {
         // Generate serial number automatically
         const serial_number = await generateGatewaySerial();
 
-        const [result] = await db.execute(
+        const [result] = await pool.execute(
             'INSERT INTO gateways (name, serial_number, description, location, location_lat, location_lng, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [name, serial_number, description, location, location_lat, location_lng, req.user.id]
         );
@@ -89,7 +89,7 @@ export const updateGateway = async (req, res) => {
 
         const { name, description, location, location_lat, location_lng } = req.body;
 
-        const [result] = await db.execute(
+        const [result] = await pool.execute(
             'UPDATE gateways SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ? WHERE id = ? AND user_id = ?',
             [name, description, location, location_lat, location_lng, req.params.id, req.user.id]
         );
@@ -108,7 +108,7 @@ export const updateGateway = async (req, res) => {
 // Delete gateway
 export const deleteGateway = async (req, res) => {
     try {
-        const [sensors] = await db.execute(
+        const [sensors] = await pool.execute(
             'SELECT id FROM sensors WHERE gateway_id = ?',
             [req.params.id]
         );
@@ -119,7 +119,7 @@ export const deleteGateway = async (req, res) => {
             });
         }
 
-        const [result] = await db.execute(
+        const [result] = await pool.execute(
             'DELETE FROM gateways WHERE id = ? AND user_id = ?',
             [req.params.id, req.user.id]
         );
@@ -141,7 +141,7 @@ export const deleteGateway = async (req, res) => {
 // Get all Gateways for authenticated user
 export const getGateways = async (req, res) => {
     try {
-        const [gateways] = await db.execute(
+        const [gateways] = await pool.execute(
             'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE user_id = ? ORDER BY created_at DESC',
             [req.user.id]
         );
@@ -156,7 +156,7 @@ export const getGateways = async (req, res) => {
 //get all Gateways for admin
 export const getAllGateways = async (req, res) => {
     try {
-        const [gateways] = await db.execute(
+        const [gateways] = await pool.execute(
             'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways ORDER BY created_at DESC'
         );
 
@@ -170,7 +170,7 @@ export const getAllGateways = async (req, res) => {
 // Get single Gateway
 export const getGatewayById = async (req, res) => {
     try {
-        const [gateways] = await db.execute(
+        const [gateways] = await pool.execute(
             'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE id = ? AND user_id = ?',
             [req.params.id, req.user.id]
         );
@@ -189,7 +189,7 @@ export const getGatewayById = async (req, res) => {
 export const getGatewaysData = async (req, res) => {
     try {
         // 1️⃣ Get gateway
-        const [gateways] = await db.execute(
+        const [gateways] = await pool.execute(
             `SELECT id, name, serial_number, description, location,
               location_lat, location_lng, status, created_at
        FROM gateways
@@ -202,7 +202,7 @@ export const getGatewaysData = async (req, res) => {
         }
 
         // 2️⃣ Get sensors for this gateway
-        const [sensors] = await db.execute(
+        const [sensors] = await pool.execute(
             `SELECT id, name, serial_number, description, location,
               location_lat, location_lng, status, created_at
        FROM sensors
