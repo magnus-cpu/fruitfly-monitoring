@@ -17,6 +17,7 @@ import imageData from './routes/imageData.routes.js';
 import countsData from './routes/countsData.routes.js';
 import dashboardData from './routes/dashboardData.routes.js'
 import data from './routes/data.routes.js'
+import db from './config/database.js';
 
 dotenv.config();
 
@@ -58,12 +59,25 @@ app.use(express.json({ limit: MAX_PAYLOAD_SIZE }));
 app.use(express.urlencoded({ extended: true, limit: MAX_PAYLOAD_SIZE }));
 
 // Health check route
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    const conn = await db(); // get a DB connection
+    await conn.query('SELECT 1');        // test query
+    conn.release?.();                     // release if using pool
+    res.json({
+      status: 'OK',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'ERROR',
+      database: 'not connected',
+      timestamp: new Date().toISOString(),
+      error: err.message
+    });
+  }
 });
 
 // API routes
