@@ -136,18 +136,18 @@ CREATE TABLE IF NOT EXISTS content_blocks (
 );
 
 -- Seed defaults (safe upsert)
--- INSERT INTO content_blocks (page_key, section_key, title, body, style, order_index)
--- VALUES
---   ('dashboard', 'overview', 'Farm Overview Tips', 'Use the map to spot hotspots. Click a sensor to see its last reading, and confirm gateway coverage for each sector.', 'accordion', 1),
---   ('dashboard', 'control', 'Control Measures', 'Apply bait sprays on rising counts, remove fallen fruit weekly, and keep sanitation logs for compliance.', 'card', 2),
---   ('reports', 'insights', 'How To Read Reports', 'Summary shows farm-wide averages. Analytics lists sensor-level extremes to flag anomalies and high-pressure zones.', 'card', 1),
---   ('reports', 'actions', 'Action Hints', 'Compare fly totals week to week. Escalate when counts exceed seasonal baseline.', 'accordion', 2),
---   ('sensors', 'operations', 'Sensor Operations', 'Check battery health, clean traps weekly, and verify location accuracy after relocation.', 'accordion', 1),
---   ('sensors', 'control', 'Field Control Measures', 'Increase monitoring after rain. Rotate attractants monthly to avoid desensitization.', 'card', 2),
---   ('gateways', 'maintenance', 'Gateway Maintenance', 'Keep gateways elevated, ensure cellular signal strength, and confirm last_seen after storms.', 'card', 1),
---   ('gateways', 'deployment', 'Deployment Tips', 'Place gateways near line-of-sight to sensor clusters and avoid metal obstructions.', 'accordion', 2)
--- ON DUPLICATE KEY UPDATE
---   title = VALUES(title),
---   body = VALUES(body),
---   style = VALUES(style),
---   order_index = VALUES(order_index);
+INSERT INTO content_blocks (page_key, section_key, title, body, style, order_index)
+VALUES
+  ('dashboard', 'overview', 'Farm Overview Tips', 'Use the map to spot hotspots. Click a sensor to see its last reading, and confirm gateway coverage for each sector.', 'accordion', 1),
+  ('dashboard', 'control', 'Control Measures', 'Apply bait sprays on rising counts, remove fallen fruit weekly, and keep sanitation logs for compliance.', 'card', 2),
+  ('reports', 'insights', 'How To Read Reports', 'Summary shows farm-wide averages. Analytics lists sensor-level extremes to flag anomalies and high-pressure zones.', 'card', 1),
+  ('reports', 'actions', 'Action Hints', 'Compare fly totals week to week. Escalate when counts exceed seasonal baseline.', 'accordion', 2),
+  ('sensors', 'operations', 'Sensor Operations', 'Check battery health, clean traps weekly, and verify location accuracy after relocation.', 'accordion', 1),
+  ('sensors', 'control', 'Field Control Measures', 'Increase monitoring after rain. Rotate attractants monthly to avoid desensitization.', 'card', 2),
+  ('gateways', 'maintenance', 'Gateway Maintenance', 'Keep gateways elevated, ensure cellular signal strength, and confirm last_seen after storms.', 'card', 1),
+  ('gateways', 'deployment', 'Deployment Tips', 'Place gateways near line-of-sight to sensor clusters and avoid metal obstructions.', 'accordion', 2)
+ON DUPLICATE KEY UPDATE
+  title = VALUES(title),
+  body = VALUES(body),
+  style = VALUES(style),
+  order_index = VALUES(order_index);
