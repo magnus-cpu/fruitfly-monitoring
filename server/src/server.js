@@ -34,7 +34,27 @@ const __dirname = path.dirname(__filename);
 
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://*.tile.openstreetmap.org",
+          "https://images.unsplash.com"
+        ],
+        connectSrc: ["'self'", "https:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'self'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+  })
+);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -118,8 +138,8 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(() => {
-// app.listen(PORT, () => {
+// app.listen(() => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
 });
