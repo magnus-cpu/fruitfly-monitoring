@@ -44,7 +44,7 @@ app.use(
         imgSrc: [
           "'self'",
           "data:",
-          "https://tile.openstreetmap.org",
+          "https://*.tile.openstreetmap.org",
           "https://images.unsplash.com",
           "https://maps.gstatic.com"
         ],
