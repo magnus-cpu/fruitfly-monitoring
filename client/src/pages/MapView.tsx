@@ -16,6 +16,7 @@ interface SensorData {
 interface SensorProperties {
     id: number;
     name: string;
+    serial_number: string;
     location: string;
     entity: 'sensor' | 'gateway';
     gateway_id?: number;
@@ -110,16 +111,16 @@ const MapView: React.FC = () => {
         loadLocations();
     }, []);
 
-    const refreshLatest = useCallback(async (sensorList: Array<{ id: number }>) => {
+    const refreshLatest = useCallback(async (sensorList: Array<{ serial_number: string }>) => {
         return Promise.all(
             sensorList.map(async (sensor) => {
                 try {
-                    const response = await api.get(`/sensor-data/${sensor.id}/data`);
+                    const response = await api.get(`/fruitfly/${sensor.serial_number}/combined_data`);
                     const latest = response.data?.[response.data.length - 1] ?? null;
-                    return [sensor.id, latest] as const;
+                    return [sensor.serial_number, latest] as const;
                 } catch (error) {
-                    console.error(`Failed to load data for sensor ${sensor.id}`, error);
-                    return [sensor.id, null] as const;
+                    console.error(`Failed to load data for sensor ${sensor.serial_number}`, error);
+                    return [sensor.serial_number, null] as const;
                 }
             })
         );
@@ -135,7 +136,7 @@ const MapView: React.FC = () => {
         const fetchLatest = async () => {
             const entries = await refreshLatest(
                 sensorFeatures.map(f => ({
-                    id: f.properties.id
+                    serial_number: f.properties.serial_number
                 }))
             );
             if (!cancelled) {

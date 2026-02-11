@@ -44,7 +44,7 @@ app.use(
         imgSrc: [
           "'self'",
           "data:",
-          "https://*.tile.openstreetmap.org",
+          "https://openstreetmap.org",
           "https://images.unsplash.com",
           "https://maps.gstatic.com"
         ],
@@ -68,7 +68,7 @@ app.use('/api/', limiter);
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
     ? ['https://trapiq.co.tz']
-    : ['http://localhost:5173', 'http://192.168.137.1:5173'],
+    : ['http://localhost:5173'],
   credentials: true,
   optionsSuccessStatus: 200
 };

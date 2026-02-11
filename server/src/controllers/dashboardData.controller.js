@@ -17,6 +17,7 @@ export const getLocations = async (req, res) => {
           g.location_lng AS gateway_lng,
           s.id AS sensor_id,
           s.name AS sensor_name,
+          s.serial_number AS serial_number,
           s.location AS sensor_location,
           s.location_lat AS sensor_lat,
           s.location_lng AS sensor_lng,
@@ -72,6 +73,7 @@ export const getLocations = async (req, res) => {
           properties: {
             id: row.sensor_id,
             name: row.sensor_name,
+            serial_number: row.serial_number,
             location: row.sensor_location,
             entity: 'sensor',
             gateway_id: row.gateway_id,
