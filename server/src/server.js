@@ -45,7 +45,8 @@ app.use(
           "'self'",
           "data:",
           "https://*.tile.openstreetmap.org",
-          "https://images.unsplash.com"
+          "https://images.unsplash.com",
+          "https://maps.gstatic.com"
         ],
         connectSrc: ["'self'", "https:"],
         objectSrc: ["'none'"],
