@@ -7,6 +7,7 @@ import {
   AlertTriangle, X, Loader, Activity
 } from 'lucide-react';
 import type { FieldProps, ModalProps, ProfileProps } from '../types/profileTypes';
+import api from '../api/Sapi';
 
 interface Sensor {
   id: number;
@@ -16,8 +17,16 @@ interface Sensor {
   created_at: string;
 }
 
+interface Gateway {
+  id: number;
+  name: string;
+  location: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
+
 const Profile: React.FC = () => {
-  const {logout } = useAuth();
+  const { logout } = useAuth();
   const [profile, setProfile] = useState<ProfileProps | null>(null);
   const nav = useNavigate();
 
@@ -38,28 +47,42 @@ const Profile: React.FC = () => {
 
   /* ---- devices ---- */
   const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [gateways, setGateways] = useState<Gateway[]>([]);
 
   /* ---- initial data ---- */
   useEffect(() => {
-
-    setForm({ username: profile?.username || '', email: profile?.email || '', password: '', newPassword: '' });
     const fetchData = async () => {
       /* 1.  own profile (extra safety – in case context is stale) */
-      const data = await axios.get('http://localhost:5000/api/users/profile');
+      const data = await api.get('/users/profile');
       setProfile(data.data);
 
       /* 2.  all sensors – filter client-side by user.id */
-        const response = await axios.get('http://localhost:5000/api/sensors');
+      const response = await api.get('/sensors');
       setSensors(response.data);
+
+      /* 3.  gateways for user */
+      const gatewaysRes = await api.get('/gateways');
+      setGateways(gatewaysRes.data);
     };
     fetchData();
-  }, [profile?.username, profile?.email]);
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    setForm({
+      username: profile.username || '',
+      email: profile.email || '',
+      password: '',
+      newPassword: '',
+    });
+  }, [profile]);
+
 
   /* ---- handlers ---- */
   const handleUpdateProfile = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.put('http://localhost:5000/api/users/profile', {
+      const { data } = await api.put('/users/profile', {
         username: form.username,
         email: form.email,
       });
@@ -80,7 +103,7 @@ const Profile: React.FC = () => {
   const handleChangePass = async () => {
     setLoading(true);
     try {
-      await axios.put('http://localhost:5000/api/users/profile/change-password', {
+      await api.put('/users/profile/change-password', {
         password: form.password,
         newPassword: form.newPassword,
       });
@@ -101,7 +124,7 @@ const Profile: React.FC = () => {
   const handleDeleteAccount = async () => {
     setLoading(true);
     try {
-      await axios.delete('http://localhost:5000/api/users/profile');
+      await api.delete('/users/profile');
       logout();
       nav('/login');
     } catch (e: unknown) {
@@ -140,6 +163,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
     ) : null;
+
 
     if (!profile) return null;
 
@@ -205,16 +229,44 @@ const Profile: React.FC = () => {
 
         {/* ---- devices ---- */}
         <div className="mt-8 bg-white rounded-xl shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">My Devices ({sensors.length})</h2>
-          {sensors.length === 0 ? (
+          <h2 className="text-xl font-semibold mb-4">
+            My Devices ({sensors.length + gateways.length})
+          </h2>
+          {sensors.length === 0 && gateways.length === 0 ? (
             <p className="text-gray-500">No devices registered yet.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {gateways.map((g) => (
+                <div key={`gateway-${g.id}`} className="border rounded-lg p-4 hover:shadow transition">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-800">{g.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Gateway</p>
+                      <p className="text-sm text-gray-500 flex items-center space-x-1">
+                        <MapPin className="w-3 h-3" />
+                        <span>{g.location}</span>
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        g.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {g.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Added {new Date(g.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+
               {sensors.map((s) => (
                 <div key={s.id} className="border rounded-lg p-4 hover:shadow transition">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-semibold text-gray-800">{s.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Sensor</p>
                       <p className="text-sm text-gray-500 flex items-center space-x-1">
                         <MapPin className="w-3 h-3" />
                         <span>{s.location}</span>
@@ -236,6 +288,7 @@ const Profile: React.FC = () => {
             </div>
           )}
         </div>
+
       </div>
 
       {/* ---------- modals ---------- */}

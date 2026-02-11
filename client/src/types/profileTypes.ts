@@ -4,6 +4,7 @@ export interface ProfileProps {
     email: string;
     created_at: string;
     password: string;
+    role?: 'admin' | 'user';
 
 }
 

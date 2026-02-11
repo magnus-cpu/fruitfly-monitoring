@@ -1,6 +1,7 @@
 import express from 'express';
 import { 
-  getSensors, 
+  getNodeSensors, 
+  getSensors,
   getAllSensors,
   getSensorById,
   createNode,
@@ -17,11 +18,12 @@ router.use(authenticateToken);
 
 // Sensor routes
 router.get('/', getSensors);
+router.get('/:id/nodes', getNodeSensors);
 router.get('/admin', getAllSensors);
 router.get('/:id', getSensorById);
 
 
-router.post('/', validateSensor, createNode);
+router.post('/:id/nodes', validateSensor, createNode);
 router.put('/:id', validateSensor, updateNode);
 router.delete('/:id', deleteNode);
 

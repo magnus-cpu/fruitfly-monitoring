@@ -1,11 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/useAuth';
-import axios from 'axios';
-import { Plus, MapPin, Thermometer, Droplets, Trash2, Edit } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Plus,
+  MapPin,
+  Trash2,
+  Edit,
+  Activity,
+  Wifi,
+  Cpu,
+  ChevronRight,
+  Info,
+  X,
+  PinIcon,
+  LucideEye
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/Sapi';
+import { PageInfo, type ContentBlock } from '../components/PageInfo';
 
 interface Gateway {
   id: number;
   name: string;
+  serial_number: string;
+  description: string;
+  location: string;
+  location_lat: number;
+  location_lng: number;
+  status: string;
+  created_at: string;
+}
+interface Node {
+  id: number;
+  name: string;
+  serial_number: string;
   description: string;
   location: string;
   location_lat: number;
@@ -14,24 +40,37 @@ interface Gateway {
   created_at: string;
 }
 
-interface GatewayData {
-  id: number;
-  temperature: number;
-  humidity: number;
-  created_at: string;
-}
-
-const GateWays: React.FC = () => {
-  const { user } = useAuth();
+const GateWays = () => {
+  // --- State Management ---
   const [gateways, setGateways] = useState<Gateway[]>([]);
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [selectedGateway, setSelectedGateway] = useState<Gateway | null>(null);
-  const [gatewayData, setGatewayData] = useState<GatewayData[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [editingGateway, setEditingGateway] = useState<Gateway | null>(null);
+  const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([]);
+  const navigate = useNavigate();
 
-  // Form state
+  const [loading, setLoading] = useState({
+    gateways: false,
+    nodes: false,
+    submit: false
+  });
+
+  type FormType = 'gateway' | 'node';
+  type FormMode = 'create' | 'edit';
+
+  interface FormConfig {
+    isOpen: boolean;
+    type: FormType;
+    mode: FormMode;
+    data: Gateway | Node | null;
+  }
+
+  const [formConfig, setFormConfig] = useState<FormConfig>({
+    isOpen: false,
+    type: 'gateway',
+    mode: 'create',
+    data: null,
+  });
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -40,398 +79,489 @@ const GateWays: React.FC = () => {
     location_lng: '',
   });
 
-
-  const fetchGateways = async () => {
+  // --- Data Fetching ---
+  const fetchGateways = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/gateways');
-      const parsed = response.data.map((s: Gateway) => ({
-        ...s,
-        location_lat: Number(s.location_lat),
-        location_lng: Number(s.location_lng),
-      }));
-      setGateways(parsed);
-    } catch (error) {
-      console.error('Error fetching Getways:', error);
+      setLoading(prev => ({ ...prev, gateways: true }));
+      const { data } = await api.get('/gateways');
+      setGateways(data.map((g: Gateway) => ({
+        ...g,
+        location_lat: Number(g.location_lat),
+        location_lng: Number(g.location_lng)
+      })));
+    } catch (err) {
+      console.error("Failed to fetch gateways", err);
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, gateways: false }));
     }
-  };
-
-  const fetchGatewayData = async (gatewayId: number) => {
-    try {
-      setDataLoading(false);
-      const response = await axios.get(`http://localhost:5000/api/gateways-data/${gatewayId}/data`);
-      setGatewayData(response.data);
-    } catch (error) {
-      console.error('Error fetching Gateway data:', error);
-    } finally {
-      setDataLoading(false);
-    }
-  };
-
-  // Fetch all Gateways once
-  useEffect(() => {
-    fetchGateways();
   }, []);
 
-  // Auto-refresh selected Gateway’s data
-  useEffect(() => {
-    if (!selectedGateway) return; // No Gateway selected yet
-
-    // Fetch immediately
-    fetchGatewayData(selectedGateway.id);
-
-    // Refresh every 5 seconds
-    const interval = setInterval(() => {
-      fetchGatewayData(selectedGateway.id);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [selectedGateway]);
-
-
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name || !formData.location_lat || !formData.location_lng) {
-      alert('Please fill in all fields');
-      return;
+  const fetchNodes = useCallback(async (gatewayId: number) => {
+    try {
+      setLoading(prev => ({ ...prev, nodes: true }));
+      const { data } = await api.get(`/sensors/${gatewayId}/nodes`);
+      setNodes(data);
+    } catch (err) {
+      console.error("Failed to fetch nodes", err);
+      setNodes([]); // Reset nodes on error or if endpoint doesn't exist yet
+    } finally {
+      setLoading(prev => ({ ...prev, nodes: false }));
     }
+  }, []);
+
+  useEffect(() => {
+    fetchGateways();
+  }, [fetchGateways]);
+
+  useEffect(() => {
+    api.get('/content', { params: { page: 'gateways' } })
+      .then((res) => setContentBlocks(res.data))
+      .catch((err) => console.error('Failed to load gateways info', err));
+  }, []);
+
+  useEffect(() => {
+    if (selectedGateway) {
+      fetchNodes(selectedGateway.id);
+    }
+  }, [selectedGateway, fetchNodes]);
+
+  // --- Handlers ---
+  const handleOpenForm = (type: FormType, mode: FormMode, item?: Gateway | Node | null) => {
+    setFormConfig({ isOpen: true, type, mode, data: item ?? null });
+    if (item) {
+      setFormData({
+        name: item.name || '',
+        description: item.description || '',
+        location: item.location || '',
+        location_lat: String(item.location_lat || ''),
+        location_lng: String(item.location_lng || ''),
+      });
+    } else {
+      setFormData({ name: '', description: '', location: '', location_lat: '', location_lng: '' });
+    }
+  };
+
+  const handleCloseForm = () => {
+    setFormConfig({ ...formConfig, isOpen: false });
+    setFormData({ name: '', description: '', location: '', location_lat: '', location_lng: '' });
+  };
+
+  const handleSubmit = async (e: { preventDefault: () => void; }) => {
+    e.preventDefault();
+    setLoading(prev => ({ ...prev, submit: true }));
 
     const payload = {
-      name: formData.name,
-      description: formData.description,
-      location: formData.location,
+      ...formData,
       location_lat: parseFloat(formData.location_lat),
       location_lng: parseFloat(formData.location_lng),
     };
 
     try {
-      if (editingGateway) {
-        /* ---------- UPDATE ---------- */
-        await axios.put(
-          `http://localhost:5000/api/gateways/${editingGateway.id}`,
-          payload
-        );
-        // Optimistic local update
-        setGateways((prev) =>
-          prev.map((s) =>
-            s.id === editingGateway.id ? { ...s, ...payload } : s
-          )
-        );
-        if (selectedGateway?.id === editingGateway.id) {
-          setSelectedGateway({ ...selectedGateway, ...payload });
-        }
+      let endpoint = '';
+
+      if (formConfig.type === 'gateway') {
+        endpoint = 'gateways';
       } else {
-        /* ---------- CREATE ---------- */
-        const { data } = await axios.post(
-          'http://localhost:5000/api/gateways',
-          payload
-        );
-        setGateways((prev) => [
-          ...prev,
-          { ...payload, id: data.id, status: 'active', created_at: new Date().toISOString() },
-        ]);
+        endpoint = `sensors/${selectedGateway?.id}/nodes`;
       }
 
-      // Reset form + close drawer
-      setFormData({
-        name: '',
-        description: '',
-        location: '',
-        location_lat: '',
-        location_lng: '',
-      });
-      setShowAddForm(false);
-      setEditingGateway(null);
+      if (formConfig.mode === 'edit' && formConfig.data) {
+        const id = formConfig.data.id;
+
+        let endpoint = '';
+
+        if (formConfig.type === 'gateway') {
+          endpoint = 'gateways';
+        } else {
+          endpoint = 'sensors';
+        }
+
+        await api.put(`/${endpoint}/${id}`, payload);
+      } else {
+        await api.post(`/${endpoint}`, payload);
+      }
+
+      // Refresh Data
+      if (formConfig.type === 'gateway') fetchGateways();
+      else if (selectedGateway) fetchNodes(selectedGateway.id);
+
+      handleCloseForm();
     } catch (err) {
-      console.error(err);
-      alert('Operation failed');
+      console.error("Form submission failed", err);
+    } finally {
+      setLoading(prev => ({ ...prev, submit: false }));
     }
   };
-  const deleteGateway = async (gatewayId: number) => {
-    if (!confirm('Are you sure you want to delete this gateway?')) return;
 
+  const handleDelete = async (type: string, id: number) => {
+    if (!window.confirm(`Are you sure you want to delete this ${type}?`)) return;
     try {
-      await axios.delete(`http://localhost:5000/api/gateways/${gatewayId}`);
-      setGateways(gateways.filter(s => s.id !== gatewayId));
-      if (selectedGateway?.id === gatewayId) {
-        setSelectedGateway(null);
-        setGatewayData([]);
+      let endpoint = '';
+
+      if (type === 'gateway') {
+        endpoint = 'gateways';
+      } else {
+        endpoint = 'sensors';
       }
-    } catch (error) {
-      console.error('Error deleting Gateway:', error);
-      alert('Failed to delete Gateway');
+      await api.delete(`/${endpoint}/${id}`);
+      if (type === 'gateway') {
+        fetchGateways();
+        if (selectedGateway?.id === id) setSelectedGateway(null);
+      } else {
+        if (selectedGateway) fetchNodes(selectedGateway.id);
+      }
+    } catch (err) {
+      console.error(`Delete ${type} failed`, err);
     }
   };
 
+  const handleNavigateData = async (id: number) => {
+    navigate(`/gateways/${id}/sensors`);
 
-  const startEdit = (gateway: Gateway) => {
-    setEditingGateway(gateway);
-    setFormData({
-      name: gateway.name,
-      description: gateway.description,
-      location: gateway.location,
-      location_lat: String(gateway.location_lat),
-      location_lng: String(gateway.location_lng),
-    });
-    setShowAddForm(true);          // we reuse the same UI
-  };
+  }
 
-  const selectGateway = (gateway: Gateway) => {
-    setSelectedGateway(gateway);
-    fetchGatewayData(gateway.id);
-  };
+  // --- Components ---
+  const StatusBadge: React.FC<{ status?: string }> = ({ status }) => (
+    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+      }`}>
+      {status || 'unknown'}
+    </span>
+  );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-         <h1 className="text-3xl font-bold">Gateways</h1>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Gateway
-        </button>
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-widest">Devices Management</h1>
+            <p className="text-slate-500  mt-1">Monitor and manage your IoT Gateways and Nodes</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleOpenForm('gateway', 'create')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-sm"
+            >
+              <Plus size={18} /> Add Gateway
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Gateways Sidebar */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+                  <Wifi size={18} className="text-indigo-500" /> Gateways
+                </h2>
+                <span className="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full">
+                  {gateways.length}
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                {loading.gateways ? (
+                  <div className="p-8 text-center text-slate-400">Loading...</div>
+                ) : gateways.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 italic">No gateways configured</div>
+                ) : (
+                  gateways.map(gw => (
+
+                    <div
+                      key={gw.id}
+                      onClick={() => setSelectedGateway(gw)}
+                      className={`p-4 cursor-pointer transition-all hover:bg-slate-50 group rounded-lg 
+                        ${selectedGateway?.id === gw.id ? 'bg-indigo-50/50 border-r-4 border-indigo-500' : 'border border-slate-200'}
+                      `}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+
+                        {/* Left Section: Icon + Info */}
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={`w-12 h-12 flex items-center justify-center rounded-lg 
+                              ${selectedGateway?.id === gw.id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`
+                            }>
+                            <Activity size={20} />
+                          </div>
+
+                          <div className="flex-1">
+                            <h3 className="font-medium text-slate-900">{gw.name}</h3>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+                              <div className="flex items-center gap-1">
+                                <MapPin size={12} /> <span>{gw.location}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <PinIcon size={12} /> <span>{gw.serial_number}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Section: Status + Actions */}
+                        <div className="flex flex-col items-end gap-2">
+
+                          {/* Status + View Data */}
+                          <div className="flex items-center gap-2 bg-black/5 p-2 rounded-lg">
+                            <StatusBadge status={gw.status} />
+
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleNavigateData(gw.id); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-indigo-600 bg-white hover:bg-indigo-50 rounded-md border border-slate-200 shadow-sm transition-all"
+                            >
+                              <LucideEye size={14} />
+                              <span className="text-xs font-medium whitespace-nowrap">View Data</span>
+                            </button>
+                          </div>
+
+                          {/* Edit/Delete Buttons */}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleOpenForm('gateway', 'edit', gw); }}
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-md border border-transparent hover:border-slate-200 shadow-sm"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDelete('gateway', gw.id); }}
+                              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-white rounded-md border border-transparent hover:border-slate-200 shadow-sm"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    </div>
+
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Nodes Content Area */}
+          <div className="lg:col-span-8">
+            {selectedGateway ? (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                {/* Gateway Detail Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex gap-4">
+                      <div className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                        <Wifi size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">{selectedGateway!.name}</h2>
+                        <p className="text-slate-500 text-sm max-w-md">{selectedGateway!.description || 'No description provided.'}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleOpenForm('node', 'create')}
+                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                    >
+                      <Plus size={16} /> Register Node
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Status</div>
+                      <StatusBadge status={selectedGateway!.status} />
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Coordinates</div>
+                      <div className="text-sm font-mono text-slate-700">{selectedGateway!.location_lat.toFixed(4)}, {selectedGateway!.location_lng.toFixed(4)}</div>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Active Nodes</div>
+                      <div className="text-sm font-bold text-slate-700">{nodes.length} Connected</div>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Location</div>
+                      <div className="text-sm font-medium text-slate-700 truncate">{selectedGateway!.location}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nodes List */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                      <Cpu size={18} className="text-emerald-500" /> Connected Nodes
+                    </h3>
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {loading.nodes ? (
+                      <div className="p-12 text-center text-slate-400">Fetching nodes...</div>
+                    ) : nodes.length === 0 ? (
+                      <div className="p-12 text-center">
+                        <div className="inline-flex p-4 rounded-full bg-slate-50 text-slate-300 mb-3">
+                          <Info size={32} />
+                        </div>
+                        <p className="text-slate-500">No nodes registered to this gateway yet.</p>
+                      </div>
+                    ) : (
+
+                      nodes.map(node => (
+                        <div key={node.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+                              <Cpu size={20} />
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-slate-900">{node.name}</h4>
+
+                              <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-slate-500">{node.location} • {node.description || 'No description'} </p>
+                                <PinIcon size={12} /> {node.serial_number}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <StatusBadge status={node.status} />
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleOpenForm('node', 'edit', node)}
+                                className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-white border border-transparent hover:border-slate-100"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete('node', node.id)}
+                                className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-white border border-transparent hover:border-slate-100"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full min-h-[400px] flex flex-col items-center justify-center bg-white rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4">
+                  <Wifi size={40} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">No Gateway Selected</h3>
+                <p className="text-slate-500 mt-2 max-w-xs">
+                  Select a gateway from the list on the left to view its connected nodes and detailed performance data.
+                </p>
+                <div className="mt-8 flex gap-2">
+                  <div className="flex items-center gap-2 text-sm text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">
+                    <ChevronRight size={14} /> Select from sidebar
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-10">
+          <PageInfo title="Deployment & Maintenance" blocks={contentBlocks} />
+        </div>
       </div>
 
-      {/* Add Gateway Form */}
-      {showAddForm && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">
-            {editingGateway ? "Update Gateway" : "Add New Gateway"}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gateway Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Greenhouse Gateway 1"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gateway Location
-                </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Greenhouse Gateway 1"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Latitude
-                </label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={formData.location_lat}
-                  onChange={(e) => setFormData({ ...formData, location_lat: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 40.7128"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Longitude
-                </label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={formData.location_lng}
-                  onChange={(e) => setFormData({ ...formData, location_lng: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., -74.0060"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gateway Description
-                </label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Any special notes"
+      {/* Unified Form Modal */}
+      {formConfig.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h2 className="text-lg font-bold text-slate-800 capitalize">
+                {formConfig.mode} {formConfig.type}
+                {formConfig.type === 'node' && ` (for ${selectedGateway?.name})`}
+              </h2>
+              <button onClick={handleCloseForm} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
 
-                />
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
+                    placeholder={`Enter ${formConfig.type} name`}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Location Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
+                    placeholder="Physical location (e.g. Zone A)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={formData.location_lat}
+                    onChange={(e) => setFormData({ ...formData, location_lat: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={formData.location_lng}
+                    onChange={(e) => setFormData({ ...formData, location_lng: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
+                  <textarea
+                    rows-3
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none resize-none"
+                    placeholder="Optional details..."
+                  />
+                </div>
               </div>
-            </div>
-            <div className="flex space-x-4">
-              <button
-                type="submit"
-                className={`px-6 py-2 rounded-md text-white ${editingGateway
-                  ? "bg-yellow-500 hover:bg-yellow-600"
-                  : "bg-green-500 hover:bg-green-600"
-                  }`}
-              >
-                {editingGateway ? "Update Gateway" : "Create Gateway"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setEditingGateway(null);
-                }}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseForm}
+                  className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading.submit}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
+                >
+                  {loading.submit ? 'Saving...' : formConfig.mode === 'edit' ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Gateways List */}
-        <div className="bg-white rounded-lg shadow-md">
-          <div className="px-6 py-4 border-b border-gray-200">
-            {/* <h1 className="text-3xl font-bold">@{user?.username}</h1> */}
-            <h2 className="text-xl font-semibold">@{user?.username} Gateways ({gateways.length})</h2>
-          </div>
-          {loading ? (
-            <div className="p-6 text-center">Loading gateways...</div>
-          ) : gateways.length === 0 ? (
-            <div className="p-6  text-center text-gray-500">
-              No gateways added yet. Click "Add gateway" to get started!
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {gateways.map((gateway) => (
-                <div
-                  key={gateway.id}
-                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${selectedGateway?.id === gateway.id ? 'bg-blue-50' : ''
-                    }`}
-                  onClick={() => selectGateway(gateway)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <MapPin className="w-5 h-5 text-blue-500" />
-                      <div>
-                        <h3 className="font-medium text-gray-900">{gateway.name}</h3>
-                        <p className="text-sm text-gray-500">
-                          {gateway.location_lat.toFixed(6)}, {gateway.location_lng.toFixed(6)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${gateway.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                          }`}
-                      >
-                        {gateway.status}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEdit(gateway);
-                        }}
-                        className="text-blue-500 hover:text-blue-700 p-1"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteGateway(gateway.id);
-                        }}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Gateway Data */}
-        <div className="bg-white rounded-lg shadow-md">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold">
-              {selectedGateway ? `${selectedGateway.name} Data` : 'Select a Gateway'}
-            </h2>
-          </div>
-          {selectedGateway ? (
-            <div className="p-6">
-              {dataLoading ? (
-                <div className="text-center">Loading gateway data...</div>
-              ) : gatewayData.length === 0 ? (
-                <div className="text-center text-gray-500">No data available for this Gateway</div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Latest Reading */}
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Latest Reading</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="flex items-center">
-                        <Thermometer className="w-5 h-5 text-red-500 mr-2" />
-                        <div>
-                          <p className="text-sm text-gray-600">Temperature</p>
-                          <p className="font-semibold">{gatewayData[0]?.temperature}°C</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        <Droplets className="w-5 h-5 text-blue-500 mr-2" />
-                        <div>
-                          <p className="text-sm text-gray-600">Humidity</p>
-                          <p className="font-semibold">{gatewayData[0]?.humidity}%</p>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Last updated: {new Date(gatewayData[0]?.created_at).toLocaleString()}
-                    </p>
-                  </div>
-
-                  {/* Recent Readings */}
-                  <div>
-                    <h3 className="font-semibold mb-3">Recent Readings</h3>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {gatewayData.slice(0, 10).map((data) => (
-                        <div key={data.id} className="flex justify-between items-center py-2 border-b border-gray-100">
-                          <div className="flex space-x-4 text-sm">
-                            <span>{data.temperature}°C</span>
-                            <span>{data.humidity}%</span>
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            {new Date(data.created_at).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="p-6 text-center text-gray-500">
-              Click on a Gateway to view its data
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

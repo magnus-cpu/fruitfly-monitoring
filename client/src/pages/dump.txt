@@ -1,0 +1,1234 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/useAuth';
+import axios from 'axios';
+import { Plus, MapPin, Thermometer, Droplets, Trash2, Edit } from 'lucide-react';
+
+interface Sensor {
+  id: number;
+  name: string;
+  description: string;
+  location: string;
+  location_lat: number;
+  location_lng: number;
+  status: string;
+  created_at: string;
+}
+
+interface SensorData {
+  id: number;
+  temperature: number;
+  humidity: number;
+  created_at: string;
+}
+
+const Sensors: React.FC = () => {
+  const { user } = useAuth();
+  const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
+  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [editingSensor, setEditingSensor] = useState<Sensor | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    location: '',
+    location_lat: '',
+    location_lng: '',
+  });
+
+
+  const fetchSensors = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('http://localhost:5000/api/sensors');
+      const parsed = response.data.map((s: Sensor) => ({
+        ...s,
+        location_lat: Number(s.location_lat),
+        location_lng: Number(s.location_lng),
+      }));
+      setSensors(parsed);
+    } catch (error) {
+      console.error('Error fetching sensors:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSensorData = async (sensorId: number) => {
+    try {
+      setDataLoading(false);
+      const response = await axios.get(`http://localhost:5000/api/sensor-data/${sensorId}/data`);
+      setSensorData(response.data);
+    } catch (error) {
+      console.error('Error fetching sensor data:', error);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  // Fetch all sensors once
+  useEffect(() => {
+    fetchSensors();
+  }, []);
+
+  // Auto-refresh selected sensor’s data
+  useEffect(() => {
+    if (!selectedSensor) return; // No sensor selected yet
+
+    // Fetch immediately
+    fetchSensorData(selectedSensor.id);
+
+    // Refresh every 5 seconds
+    const interval = setInterval(() => {
+      fetchSensorData(selectedSensor.id);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedSensor]);
+
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.location_lat || !formData.location_lng) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    const payload = {
+      name: formData.name,
+      description: formData.description,
+      location: formData.location,
+      location_lat: parseFloat(formData.location_lat),
+      location_lng: parseFloat(formData.location_lng),
+    };
+
+    try {
+      if (editingSensor) {
+        /* ---------- UPDATE ---------- */
+        await axios.put(
+          `http://localhost:5000/api/sensors/${editingSensor.id}`,
+          payload
+        );
+        // Optimistic local update
+        setSensors((prev) =>
+          prev.map((s) =>
+            s.id === editingSensor.id ? { ...s, ...payload } : s
+          )
+        );
+        if (selectedSensor?.id === editingSensor.id) {
+          setSelectedSensor({ ...selectedSensor, ...payload });
+        }
+      } else {
+        /* ---------- CREATE ---------- */
+        const { data } = await axios.post(
+          'http://localhost:5000/api/sensors',
+          payload
+        );
+        setSensors((prev) => [
+          ...prev,
+          { ...payload, id: data.id, status: 'active', created_at: new Date().toISOString() },
+        ]);
+      }
+
+      // Reset form + close drawer
+      setFormData({
+        name: '',
+        description: '',
+        location: '',
+        location_lat: '',
+        location_lng: '',
+      });
+      setShowAddForm(false);
+      setEditingSensor(null);
+    } catch (err) {
+      console.error(err);
+      alert('Operation failed');
+    }
+  };
+  const deleteSensor = async (sensorId: number) => {
+    if (!confirm('Are you sure you want to delete this sensor?')) return;
+
+    try {
+      await axios.delete(`http://localhost:5000/api/sensors/${sensorId}`);
+      setSensors(sensors.filter(s => s.id !== sensorId));
+      if (selectedSensor?.id === sensorId) {
+        setSelectedSensor(null);
+        setSensorData([]);
+      }
+    } catch (error) {
+      console.error('Error deleting sensor:', error);
+      alert('Failed to delete sensor');
+    }
+  };
+
+
+  const startEdit = (sensor: Sensor) => {
+    setEditingSensor(sensor);
+    setFormData({
+      name: sensor.name,
+      description: sensor.description,
+      location: sensor.location,
+      location_lat: String(sensor.location_lat),
+      location_lng: String(sensor.location_lng),
+    });
+    setShowAddForm(true);          // we reuse the same UI
+  };
+
+  const selectSensor = (sensor: Sensor) => {
+    setSelectedSensor(sensor);
+    fetchSensorData(sensor.id);
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+         <h1 className="text-3xl font-bold">Sensors</h1>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Add Sensor
+        </button>
+      </div>
+
+      {/* Add Sensor Form */}
+      {showAddForm && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">
+            {editingSensor ? "Update Sensor" : "Add New Sensor"}
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sensor Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Greenhouse Sensor 1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sensor Location
+                </label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Greenhouse Sensor 1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Latitude
+                </label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={formData.location_lat}
+                  onChange={(e) => setFormData({ ...formData, location_lat: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 40.7128"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Longitude
+                </label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={formData.location_lng}
+                  onChange={(e) => setFormData({ ...formData, location_lng: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., -74.0060"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sensor Description
+                </label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Any special notes"
+
+                />
+              </div>
+            </div>
+            <div className="flex space-x-4">
+              <button
+                type="submit"
+                className={`px-6 py-2 rounded-md text-white ${editingSensor
+                  ? "bg-yellow-500 hover:bg-yellow-600"
+                  : "bg-green-500 hover:bg-green-600"
+                  }`}
+              >
+                {editingSensor ? "Update Sensor" : "Create Sensor"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setEditingSensor(null);
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Sensors List */}
+        <div className="bg-white rounded-lg shadow-md">
+          <div className="px-6 py-4 border-b border-gray-200">
+            {/* <h1 className="text-3xl font-bold">@{user?.username}</h1> */}
+            <h2 className="text-xl font-semibold">@{user?.username} Sensors ({sensors.length})</h2>
+          </div>
+          {loading ? (
+            <div className="p-6 text-center">Loading sensors...</div>
+          ) : sensors.length === 0 ? (
+            <div className="p-6  text-center text-gray-500">
+              No sensors added yet. Click "Add Sensor" to get started!
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {sensors.map((sensor) => (
+                <div
+                  key={sensor.id}
+                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${selectedSensor?.id === sensor.id ? 'bg-blue-50' : ''
+                    }`}
+                  onClick={() => selectSensor(sensor)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <MapPin className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <h3 className="font-medium text-gray-900">{sensor.name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {sensor.location_lat.toFixed(6)}, {sensor.location_lng.toFixed(6)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${sensor.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}
+                      >
+                        {sensor.status}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEdit(sensor);
+                        }}
+                        className="text-blue-500 hover:text-blue-700 p-1"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSensor(sensor.id);
+                        }}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sensor Data */}
+        <div className="bg-white rounded-lg shadow-md">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold">
+              {selectedSensor ? `${selectedSensor.name} Data` : 'Select a Sensor'}
+            </h2>
+          </div>
+          {selectedSensor ? (
+            <div className="p-6">
+              {dataLoading ? (
+                <div className="text-center">Loading sensor data...</div>
+              ) : sensorData.length === 0 ? (
+                <div className="text-center text-gray-500">No data available for this sensor</div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Latest Reading */}
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">Latest Reading</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="flex items-center">
+                        <Thermometer className="w-5 h-5 text-red-500 mr-2" />
+                        <div>
+                          <p className="text-sm text-gray-600">Temperature</p>
+                          <p className="font-semibold">{sensorData[0]?.temperature}°C</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <Droplets className="w-5 h-5 text-blue-500 mr-2" />
+                        <div>
+                          <p className="text-sm text-gray-600">Humidity</p>
+                          <p className="font-semibold">{sensorData[0]?.humidity}%</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Last updated: {new Date(sensorData[0]?.created_at).toLocaleString()}
+                    </p>
+                  </div>
+
+                  {/* Recent Readings */}
+                  <div>
+                    <h3 className="font-semibold mb-3">Recent Readings</h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {sensorData.slice(0, 10).map((data) => (
+                        <div key={data.id} className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <div className="flex space-x-4 text-sm">
+                            <span>{data.temperature}°C</span>
+                            <span>{data.humidity}%</span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {new Date(data.created_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-6 text-center text-gray-500">
+              Click on a sensor to view its data
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Sensors;
+
+
+
+
+
+
+
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useAuth } from '../contexts/useAuth';
+import type { Sensor } from '../types/sensorTypes';
+import type { SetMapViewProps, FlyToMarkerProps } from '../types/mapTypes';
+import { Polyline } from 'react-leaflet';
+
+import L from 'leaflet';
+import api from '../api/Sapi';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+const sensorIcon = new L.Icon({
+  iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const gatewayIcon = new L.Icon({
+  iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
+});
+
+interface SensorData {
+  id: number;
+  temperature: number;
+  humidity: number;
+  created_at: string;
+}
+
+const SetMapView: React.FC<SetMapViewProps> = ({ lat, lng, zoom = 12 }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (lat && lng) {
+      map.setView([lat, lng], zoom);
+    }
+  }, [lat, lng, zoom, map]);
+
+  return null;
+};
+
+
+const FlyToMarker: React.FC<FlyToMarkerProps> = ({ lat, lng }) => {
+  const map = useMap();
+
+  // Smooth fly animation to the marker
+  map.flyTo([lat, lng], 16, {
+    duration: 1.5,
+  });
+
+  return null; // no UI, only behavior
+};
+
+const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [gateways, setGateways] = useState<Sensor[]>([]);
+  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+
+
+  const 
+  fetch('/api/locations')
+  .then(res => res.json())
+  .then(data => {
+    const geoJsonLayer = L.geoJSON(data, {
+      pointToLayer: function (feature, latlng) {
+        const icon = feature.properties.entity === 'gateway'
+          ? gatewayIcon
+          : sensorIcon;
+
+        return L.marker(latlng, { icon });
+      },
+      onEachFeature: function (feature, layer) {
+        const { name, location, entity } = feature.properties;
+        layer.bindPopup(`${entity.toUpperCase()}: ${name} (${location})`);
+      }
+    }).addTo(map);
+  });
+
+  
+  useEffect(() => {
+    fetchSensors();
+    fetchGetways();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async (sensorId: number) => {
+      const response = await api.get(`/sensor-data/${sensorId}/data`);
+      setSensorData(response.data);
+    };
+
+    if (sensors.length > 0) {
+      fetchData(sensors[0].id);
+    }
+  }, [sensors]);
+
+  const fetchSensors = async () => {
+    try {
+      // const [sensorRes, gatewaysRes] = await Promise.all([
+      //   api.get('/sensors'),
+      //   api.get('/gateways')
+      // ]);
+      const sensorRes = await api.get('/sensors');
+      // const gatewaysRes = await api.get('/gateways');
+      setSensors(sensorRes.data);
+      // setGateways(gatewaysRes.data);
+    } catch (error) {
+      console.error('Error  sensors:', error);
+    }
+  };
+  const fetchGetways = async () => {
+    try {
+      // const [sensorRes, gatewaysRes] = await Promise.all([
+      //   api.get('/sensors'),
+      //   api.get('/gateways')
+      // ]);
+      // const sensorRes = await api.get('/sensors');
+      const gatewaysRes = await api.get('/gateways');
+      // setSensors(sensorRes.data);
+      setGateways(gatewaysRes.data);
+    } catch (error) {
+      console.error('Error  sensors:', error);
+    }
+  };
+
+  const getGateway = (gatewayId: number) =>
+    gateways.find(g => g.id === gatewayId);
+
+
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">Welcome, {user?.username}!</h1>
+
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Sensor Map</h2>
+        <MapContainer
+          center={[40.7128, -74.0060]}
+          zoom={10}
+          scrollWheelZoom={true}
+          className="h-100 w-full">
+
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            maxZoom={22}
+          />
+          {/* Auto zoom to first sensor */}
+          {sensors.length > 0 && (
+            <SetMapView
+              lat={sensors[0].location_lat}
+              lng={sensors[0].location_lng}
+              zoom={10}
+            />
+          )}
+
+          {gateways.length > 0 &&
+            sensors.map(sensor => {
+              const gateway = getGateway(sensor.gateway_id);
+              if (!gateway) return null;
+
+              return (
+                <Polyline
+                  key={`link-${sensor.id}`}
+                  positions={[
+                    [gateway.location_lat, gateway.location_lng],
+                    [sensor.location_lat, sensor.location_lng],
+                  ]}
+                  pathOptions={{
+                    color: '#6366f1', // purple
+                    weight: 2,
+                    dashArray: '6',
+                  }}
+                />
+              );
+            })}
+
+
+          {gateways.map((g) => (
+
+            <Marker
+              key={`gateway-${g.id}`}
+              position={[g.location_lat, g.location_lng]}
+              icon={gatewayIcon}
+            >
+              <Popup>
+                <div>
+                  <b className="text-red-600 text-lg flex justify-center">
+                    🛜 Gateway
+                  </b>
+                  <br />
+                  {g.name}
+                  <br />
+                  <b className="flex justify-center">{g.name}</b>
+                  <br />
+                  Location: {g.location}
+                  <br />
+                  Status:{" "}
+                  <span
+                    className={`font-semibold ${g.status === "active" ? "text-green-600" : "text-red-600"
+                      }`}
+                  >
+                    {g.status}
+                  </span>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {sensors.length > 0 && (
+            <SetMapView
+              lat={gateways[0].location_lat}
+              lng={gateways[0].location_lng}
+              zoom={10}
+            />
+          )}
+          {sensors.map((s) => (
+
+            <Marker
+              key={`sensor-${s.id}`}
+              position={[s.location_lat, s.location_lng]}
+              icon={sensorIcon}
+            >
+              {/* <Popup>
+                <div>
+                  <h3>{sensor.name}</h3>
+                  <p>Status: {sensor.status}</p>
+                  <FlyToMarker lat={sensor.location_lat} lng={sensor.location_lng} />
+                </div>
+              </Popup> */}
+              <Popup >
+                <div>
+                  <b className="text-blue-600 text-lg">🌡️ Sensor</b>
+                  <br />
+                  {s.name}
+                  <br />
+                  Gateway ID: {s.gateway_id}
+                  <b className='flex justify-center text-xl'>{s.location}</b>
+                  <br />
+                  Status:{" "}
+                  <span
+                    className={`font-semibold ${s.status === "active" ? "text-green-600" : "text-red-600"
+                      }`}
+                  >
+                    {s.status}
+                  </span>
+
+                  <br />
+
+                  {sensorData.length > 0 && (() => {
+                    const latest = sensorData[sensorData.length - 1];
+                    const temp = latest.temperature;
+                    const hum = latest.humidity;
+
+                    // Temperature color and message
+                    let tempColor = "text-green-600";
+                    let tempLabel = "Ideal";
+
+                    if (temp < 18) {
+                      tempColor = "text-blue-500";
+                      tempLabel = "Cold";
+                    } else if (temp > 30) {
+                      tempColor = "text-red-600";
+                      tempLabel = "Hot";
+                    }
+
+                    // Humidity color and message
+                    let humColor = "text-green-600";
+                    let humLabel = "Comfortable";
+
+                    if (hum < 40) {
+                      humColor = "text-yellow-600";
+                      humLabel = "Dry";
+                    } else if (hum > 70) {
+                      humColor = "text-blue-700";
+                      humLabel = "Humid";
+                    }
+
+                    return (
+                      <>
+                        🌡️ Temp:{" "}
+                        <b className={tempColor}>
+                          {temp}°C ({tempLabel})
+                        </b>
+                        <br />
+                        💧 Humidity:{" "}
+                        <b className={humColor}>
+                          {hum}% ({humLabel})
+                        </b>
+                        <br />
+                        ⌛ Last updated:{" "}
+                        {new Date(sensorData[0]?.created_at).toLocaleString()}
+                      </>
+                    );
+                  })()}
+
+                  <FlyToMarker lat={s.location_lat} lng={s.location_lng} />
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold mb-2">Total Sensors</h3>
+          <p className="text-3xl font-bold text-blue-600">{sensors.length}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold mb-2">Active Sensors</h3>
+          <p className="text-3xl font-bold text-green-600">
+            {sensors.filter(s => s.status === 'active').length}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold mb-2">Reports Generated</h3>
+          <p className="text-3xl font-bold text-purple-600">12</p>
+        </div>
+      </div>
+    </div >
+  );
+};
+
+export default Dashboard;
+
+
+
+
+-----------------------------------------------------------------------------------
+// import React, { useState, useEffect } from 'react';
+// import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+// import 'leaflet/dist/leaflet.css';
+// import { useAuth } from '../contexts/useAuth';
+
+// import L from 'leaflet';
+// import api from '../api/Sapi';
+
+// delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+// const sensorIcon = new L.Icon({
+//   iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
+//   iconSize: [32, 32],
+//   iconAnchor: [16, 32],
+//   popupAnchor: [0, -32],
+// });
+
+// const gatewayIcon = new L.Icon({
+//   iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+//   iconSize: [36, 36],
+//   iconAnchor: [18, 36],
+//   popupAnchor: [0, -36],
+// });
+
+// const pointToLayer = (feature: any, latlng: any) => {
+//   const icon =
+//     feature.properties.entity === 'gateway'
+//       ? gatewayIcon
+//       : sensorIcon;
+
+//   return L.marker(latlng, { icon });
+// };
+
+// const onEachFeature = (feature: any, layer: any) => {
+//   const { name, location, entity, status } = feature.properties;
+
+//   layer.bindPopup(`
+//     <b>${entity.toUpperCase()}</b><br/>
+//     ${name}<br/>
+//     ${location}<br/>
+//     Status: ${status}
+//   `);
+// };
+
+// const Dashboard: React.FC = () => {
+//   const { user } = useAuth();
+//   const [geoData, setGeoData] = useState<any>(null);
+
+//   useEffect(() => {
+//     const loadLocations = async () => {
+//       const res = await api.get('/locations');
+//       setGeoData(res.data);
+//     };
+
+//     loadLocations();
+//   }, []);
+
+//   const sensorCount =
+//     geoData?.features?.filter((f: any) => f.properties.entity === 'sensor').length || 0;
+
+//   const activeSensorCount =
+//     geoData?.features?.filter(
+//       (f: any) => f.properties.entity === 'sensor' && f.properties.status === 'active'
+//     ).length || 0;
+
+//   return (
+//     <div className="container mx-auto px-4 py-8">
+//       <h1 className="text-3xl font-bold mb-6">Welcome, {user?.username}!</h1>
+
+//       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+//         <h2 className="text-xl font-semibold mb-4">Sensor Map</h2>
+//         <MapContainer
+//   center={[-6.7924, 39.2083]}
+//   zoom={10}
+//   scrollWheelZoom
+//   className="h-100 w-full"
+// >
+//   <TileLayer
+//     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+//     maxZoom={22}
+//   />
+
+//   {geoData && (
+//     <GeoJSON
+//       data={geoData}
+//       pointToLayer={pointToLayer}
+//       onEachFeature={onEachFeature}
+//     />
+//   )}
+// </MapContainer>
+
+
+//       </div>
+
+//       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+//         <div className="bg-white rounded-lg shadow-md p-6">
+//           <h3 className="text-lg font-semibold mb-2">Total Sensors</h3>
+//           <p className="text-3xl font-bold text-blue-600">{sensorCount}</p>
+//         </div>
+//         <div className="bg-white rounded-lg shadow-md p-6">
+//           <h3 className="text-lg font-semibold mb-2">Active Sensors</h3>
+//           <p className="text-3xl font-bold text-green-600">
+//             {activeSensorCount}
+//           </p>
+//         </div>
+//         <div className="bg-white rounded-lg shadow-md p-6">
+//           <h3 className="text-lg font-semibold mb-2">Reports Generated</h3>
+//           <p className="text-3xl font-bold text-purple-600">12</p>
+//         </div>
+//       </div>
+//     </div >
+//   );
+// };
+
+// export default Dashboard;
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import { 
+  Thermometer, 
+  Droplets, 
+  Bug, 
+  Activity, 
+  LayoutDashboard, 
+  Map as MapIcon, 
+  Settings, 
+  Bell,
+  Search,
+  Wifi,
+  Radio
+} from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// --- Assets & Icons ---
+const sensorIcon = new L.Icon({
+  iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const gatewayIcon = new L.Icon({
+  iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
+});
+
+// --- Components ---
+
+/**
+ * Custom hook to handle map zooming on feature hover
+ */
+const ZoomToFeature = ({ data }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (data) {
+      const group = L.geoJSON(data);
+      map.fitBounds(group.getBounds(), { padding: [50, 50] });
+    }
+  }, [data, map]);
+
+  return null;
+};
+
+const StatCard = ({ title, value, icon: Icon, colorClass }) => (
+  <div className="bg-white/10 backdrop-blur-md border border-white/10 p-5 rounded-2xl shadow-xl transition-all hover:scale-[1.02]">
+    <div className="flex justify-between items-start mb-4">
+      <div className={`p-3 rounded-xl ${colorClass} bg-opacity-20`}>
+        <Icon size={24} className={colorClass.replace('bg-', 'text-')} />
+      </div>
+      <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Live</span>
+    </div>
+    <h3 className="text-slate-400 text-sm font-medium">{title}</h3>
+    <p className="text-2xl font-bold text-white mt-1">{value}</p>
+  </div>
+);
+
+const App = () => {
+  const [geoData, setGeoData] = useState(null);
+  const [hoveredFeature, setHoveredFeature] = useState(null);
+  const [activeTab, setActiveTab] = useState('map');
+
+  // Mock data fetching
+  useEffect(() => {
+    // Simulating API response
+    const mockData = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: { 
+            id: 1, name: "North Sector A1", entity: "sensor", status: "active", 
+            temp: 24.5, humidity: 62, insects: 12 
+          },
+          geometry: { type: "Point", coordinates: [39.2083, -6.7924] }
+        },
+        {
+          type: "Feature",
+          properties: { 
+            id: 2, name: "East Gateway", entity: "gateway", status: "active",
+            temp: 26.1, humidity: 58, insects: 0 
+          },
+          geometry: { type: "Point", coordinates: [39.2500, -6.8100] }
+        },
+        {
+          type: "Feature",
+          properties: { 
+            id: 3, name: "South Sector C4", entity: "sensor", status: "inactive",
+            temp: 22.8, humidity: 70, insects: 45 
+          },
+          geometry: { type: "Point", coordinates: [39.1800, -6.8500] }
+        }
+      ]
+    };
+    setGeoData(mockData);
+  }, []);
+
+  const onEachFeature = useCallback((feature, layer) => {
+    layer.on({
+      mouseover: (e) => {
+        const map = e.target._map;
+        map.setView(e.latlng, 14, { animate: true, duration: 0.5 });
+        setHoveredFeature(feature.properties);
+        layer.openPopup();
+      },
+      mouseout: (e) => {
+        // Optional: Reset zoom or just leave it
+      }
+    });
+
+    const { name, entity, temp, humidity, insects } = feature.properties;
+    
+    layer.bindPopup(`
+      <div class="p-2 font-sans min-w-[150px]">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          <b class="text-slate-800">${name}</b>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
+          <div class="flex items-center gap-1"><i data-lucide="thermometer"></i> ${temp}°C</div>
+          <div class="flex items-center gap-1"><i data-lucide="droplets"></i> ${humidity}%</div>
+          <div class="flex items-center gap-1 col-span-2"><i data-lucide="bug"></i> ${insects} count</div>
+        </div>
+      </div>
+    `);
+  }, []);
+
+  const pointToLayer = (feature, latlng) => {
+    return L.marker(latlng, { 
+      icon: feature.properties.entity === 'gateway' ? gatewayIcon : sensorIcon 
+    });
+  };
+
+  const sensorStats = useMemo(() => {
+    if (!geoData) return { total: 0, active: 0, pests: 0 };
+    const sensors = geoData.features.filter(f => f.properties.entity === 'sensor');
+    return {
+      total: sensors.length,
+      active: sensors.filter(s => s.properties.status === 'active').length,
+      pests: sensors.reduce((acc, curr) => acc + curr.properties.insects, 0)
+    };
+  }, [geoData]);
+
+  return (
+    <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-blue-500/30">
+      
+      {/* Top Navigation */}
+      <nav className="flex items-center justify-between px-8 py-4 border-b border-white/5 bg-slate-900/50 backdrop-blur-md sticky top-0 z-[1000]">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 p-2 rounded-lg">
+            <Activity className="text-white" size={20} />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white italic">AGRI<span className="text-blue-500 font-black">SCAN</span></span>
+        </div>
+        
+        <div className="hidden md:flex items-center bg-slate-800/50 border border-white/5 rounded-full px-4 py-1.5 gap-3">
+          <Search size={16} className="text-slate-500" />
+          <input 
+            type="text" 
+            placeholder="Search nodes..." 
+            className="bg-transparent border-none focus:ring-0 text-sm w-64 text-slate-300"
+          />
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button className="relative p-2 text-slate-400 hover:text-white transition-colors">
+            <Bell size={20} />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0f172a]"></span>
+          </button>
+          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 border border-white/20"></div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-6 pt-8 pb-32">
+        <header className="mb-8">
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Farm Overview</h1>
+          <p className="text-slate-400 mt-1">Monitoring 142.5 hectares of crops across 3 sectors.</p>
+        </header>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <StatCard 
+            title="Total Sensors" 
+            value={sensorStats.total} 
+            icon={Wifi} 
+            colorClass="bg-blue-500" 
+          />
+          <StatCard 
+            title="Active Gateways" 
+            value="2/2" 
+            icon={Radio} 
+            colorClass="bg-emerald-500" 
+          />
+          <StatCard 
+            title="Avg Humidity" 
+            value="64%" 
+            icon={Droplets} 
+            colorClass="bg-cyan-500" 
+          />
+          <StatCard 
+            title="Total Pests" 
+            value={sensorStats.pests} 
+            icon={Bug} 
+            colorClass="bg-rose-500" 
+          />
+        </div>
+
+        {/* Map & Detail View */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[600px]">
+          <div className="lg:col-span-2 relative bg-slate-900 rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
+            <MapContainer
+              center={[-6.7924, 39.2083]}
+              zoom={13}
+              scrollWheelZoom
+              className="h-full w-full"
+            >
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              />
+              {geoData && (
+                <>
+                  <GeoJSON
+                    data={geoData}
+                    pointToLayer={pointToLayer}
+                    onEachFeature={onEachFeature}
+                  />
+                  <ZoomToFeature data={geoData} />
+                </>
+              )}
+            </MapContainer>
+            
+            {/* Map Overlay Indicator */}
+            <div className="absolute top-4 left-4 z-[1000] bg-slate-900/80 backdrop-blur px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-slate-300">
+              Live Feed: Precision Mode
+            </div>
+          </div>
+
+          {/* Side Info Panel */}
+          <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6 flex flex-col gap-6">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Activity size={18} className="text-blue-500" />
+              Node Intelligence
+            </h2>
+            
+            {hoveredFeature ? (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Currently Viewing</p>
+                  <h3 className="text-2xl font-bold text-white">{hoveredFeature.name}</h3>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase mt-2 ${hoveredFeature.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                    {hoveredFeature.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <Thermometer className="text-orange-400 mb-2" size={20} />
+                    <p className="text-xs text-slate-400">Temperature</p>
+                    <p className="text-xl font-bold">{hoveredFeature.temp}°C</p>
+                  </div>
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <Droplets className="text-blue-400 mb-2" size={20} />
+                    <p className="text-xs text-slate-400">Soil Moisture</p>
+                    <p className="text-xl font-bold">{hoveredFeature.humidity}%</p>
+                  </div>
+                </div>
+
+                <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2 text-rose-400">
+                      <Bug size={20} />
+                      <span className="font-bold">Insect Count</span>
+                    </div>
+                    <span className="text-xl font-black text-rose-500">{hoveredFeature.insects}</span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-rose-500 transition-all duration-1000" 
+                      style={{ width: `${Math.min(hoveredFeature.insects * 2, 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2">Threshold: 50 per node</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-40">
+                <MapIcon size={48} className="mb-4" />
+                <p className="text-sm">Hover over a map marker to view detailed node analytics</p>
+              </div>
+            )}
+            
+            <button className="mt-auto w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-blue-600/20">
+              Download Sector Report
+            </button>
+          </div>
+        </div>
+      </main>
+
+      {/* Floating Dock Navigation */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[2000]">
+        <div className="flex items-center gap-2 p-2 bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl">
+          {[
+            { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+            { id: 'map', icon: MapIcon, label: 'Map View' },
+            { id: 'alerts', icon: Bell, label: 'Alerts' },
+            { id: 'settings', icon: Settings, label: 'Settings' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 ${
+                activeTab === item.id 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/40' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <item.icon size={18} />
+              <span className={`text-sm font-bold ${activeTab === item.id ? 'block' : 'hidden md:block'}`}>
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;

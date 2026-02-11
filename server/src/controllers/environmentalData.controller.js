@@ -1,42 +1,6 @@
 import db from '../config/database.js';
 import { validationResult } from 'express-validator';
 
-// Get sensor data
-export const getEnvironmentalData = async (req, res) => {
-  try {
-    // GET sensor id from serial_number
-    const [sensorRows] = await db.execute
-      (
-        'SELECT id FROM sensors WHERE serial_number = ?',
-        [req.params.serial_number]
-      );
-
-
-    if (sensorRows.length === 0) {
-      return res.status(400).json({
-        status: false,
-        message: 'Sensor ID not registered'
-      })
-    }
-
-    const sensorId = sensorRows[0].id;
-
-    const [data] = await db.execute(
-      `SELECT id, temperature, humidity, time_taken, created_at 
-       FROM environmental_readings 
-       WHERE sensor_id = ? 
-       ORDER BY created_at DESC 
-       LIMIT 100`,
-      [sensorId]
-    );
-
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching sensor data:', error);
-    res.status(500).json({ message: 'Failed to fetch sensor data' });
-  }
-};
-
 // To store environmental data 
 export const storeEnvironmentalData = async (req, res) => {
   try {

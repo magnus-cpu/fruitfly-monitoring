@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/useAuth';
-import axios from 'axios';
 import { Download, Calendar, FileText, TrendingUp } from 'lucide-react';
+import api from '../api/Sapi';
+import { PageInfo, type ContentBlock } from '../components/PageInfo';
 
 interface Report {
   id: number;
@@ -13,27 +14,48 @@ interface Report {
 }
 
 const Reports: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reportType, setReportType] = useState('summary');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [availability, setAvailability] = useState<{ min: string | null; max: string | null }>({
+    min: null,
+    max: null
+  });
+  const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([]);
 
   useEffect(() => {
     fetchReports();
+    fetchAvailability();
+    api.get('/content', { params: { page: 'reports' } })
+      .then((res) => setContentBlocks(res.data))
+      .catch((err) => console.error('Failed to load reports info', err));
   }, []);
 
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/reports');
+      const response = await api.get('/reports');
       setReports(response.data);
     } catch (error) {
       console.error('Error fetching reports:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailability = async () => {
+    try {
+      const response = await api.get('/reports/availability');
+      setAvailability({
+        min: response.data?.min_date ?? null,
+        max: response.data?.max_date ?? null
+      });
+    } catch (error) {
+      console.error('Error fetching report availability:', error);
     }
   };
 
@@ -47,48 +69,56 @@ const Reports: React.FC = () => {
 
     try {
       setGenerating(true);
-      // const response = await axios.post('http://localhost:5000/api/reports', {
-      //   report_type: reportType,
-      //   date_range_start: startDate,
-      //   date_range_end: endDate,
-      // });
-      const response = await axios.post('http://localhost:5000/api/reports');
-      const parsed = response.data.map((r: Report) => ({
-        ...r,
-        report_type: String(r.report_type),
-        date_range_start: String(r.date_range_start),
-        date_range_end: String(r.date_range_end)
+      const response = await api.post('/reports', {
+        report_type: reportType,
+        date_range_start: startDate,
+        date_range_end: endDate
+      });
 
-      }));
-      setReports(parsed);
+      const newReport: Report = {
+        id: response.data.id,
+        report_type: reportType,
+        date_range_start: startDate,
+        date_range_end: endDate,
+        created_at: new Date().toISOString(),
+        file_path: response.data.file_path
+      };
 
-      // Simulate report generation
-      setTimeout(() => {
-        const newReport: Report = {
-          id: Date.now(),
-          report_type: reportType,
-          date_range_start: startDate,
-          date_range_end: endDate,
-          created_at: new Date().toISOString(),
-          file_path: `report_${Date.now()}.pdf`,
-        };
-        setReports([newReport, ...reports]);
-        setGenerating(false);
-        alert('Report generated successfully!');
-      }, 2000);
+      setReports((prev) => [newReport, ...prev]);
+      alert('Report generated successfully!');
     } catch (error) {
       console.error('Error generating report:', error);
       setGenerating(false);
       alert('Failed to generate report');
+      return;
     }
+    setGenerating(false);
   };
 
-  const downloadReport = (report: Report) => {
-    // Simulate download
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = `fruitfly_report_${report.id}.pdf`;
-    link.click();
+  const downloadReport = async (report: Report, format: 'json' | 'csv' | 'pdf') => {
+    try {
+      const response = await api.get(`/reports/${report.id}/download`, {
+        params: { format },
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], {
+        type:
+          format === 'pdf'
+            ? 'application/pdf'
+            : format === 'csv'
+              ? 'text/csv'
+              : 'application/json'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `fruitfly_report_${report.id}.${format}`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      alert('Failed to download report');
+    }
   };
 
   const getReportIcon = (type: string) => {
@@ -125,8 +155,6 @@ const Reports: React.FC = () => {
               >
                 <option value="summary">Summary Report</option>
                 <option value="analytics">Analytics Report</option>
-                <option value="sensor">Sensor Data Report</option>
-                <option value="alert">Alert History Report</option>
               </select>
             </div>
             <div>
@@ -137,6 +165,8 @@ const Reports: React.FC = () => {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                min={availability.min ? availability.min.slice(0, 10) : undefined}
+                max={availability.max ? availability.max.slice(0, 10) : undefined}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -148,10 +178,26 @@ const Reports: React.FC = () => {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                min={availability.min ? availability.min.slice(0, 10) : undefined}
+                max={availability.max ? availability.max.slice(0, 10) : undefined}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
+          {availability.min && availability.max ? (
+            <div className="mt-1 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <div className="font-semibold">Available data</div>
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-white px-2 py-0.5 font-semibold text-blue-800">
+                {new Date(availability.min).toLocaleDateString()}
+                <span className="text-blue-400">→</span>
+                {new Date(availability.max).toLocaleDateString()}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+              No sensor data available yet. Reports will be empty until readings are collected.
+            </div>
+          )}
           <button
             type="submit"
             disabled={generating}
@@ -195,27 +241,45 @@ const Reports: React.FC = () => {
                     <h3 className="font-medium text-gray-900 capitalize">
                       {report.report_type.replace('_', ' ')} Report
                     </h3>
-                    <p className="text-sm text-gray-500 flex items-center mt-1">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {new Date(report.date_range_start).toLocaleDateString()} -{' '}
-                      {new Date(report.date_range_end).toLocaleDateString()}
-                    </p>
+                    <div className="text-sm text-gray-500 mt-1">
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        <span className="font-medium">Range</span>
+                      </div>
+                      <div className="ml-5">
+                        {new Date(report.date_range_start).toLocaleDateString()} -{' '}
+                        {new Date(report.date_range_end).toLocaleDateString()}
+                      </div>
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">
                       Generated on {new Date(report.created_at).toLocaleString()}
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => downloadReport(report)}
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md flex items-center text-sm"
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Download
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => downloadReport(report, 'pdf')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md flex items-center text-sm"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => downloadReport(report, 'csv')}
+                    className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-md flex items-center text-sm"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    CSV
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
+      </div>
+
+      <div className="mt-10">
+        <PageInfo title="Reports Guidance" blocks={contentBlocks} />
       </div>
     </div>
   );

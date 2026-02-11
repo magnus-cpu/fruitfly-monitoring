@@ -54,6 +54,7 @@ export const validateChangePassword = [
 export const validateUpdateUserRole = [roleChain()];
 
 export const validateUserId = [idChain()];
+export const validateContentId = [idChain()];
 
 /* ---------------- Sensor routes (bonus) ---------------- */
 export const validateSensor = [
@@ -76,10 +77,19 @@ export const validateSensorData = [
 
 /* ---------------- Report routes (bonus) ---------------- */
 export const validateReport = [
-  body('sensor_id').isInt({ min: 1 }).withMessage('Valid sensor ID required'),
   body('report_type')
-    .isIn(['summary', 'analytics', 'sensor', 'alert'])
+    .isIn(['summary', 'analytics'])
     .withMessage('Invalid report type'),
   body('date_range_start').isISO8601().withMessage('Valid start date required'),
   body('date_range_end').isISO8601().withMessage('Valid end date required')
+];
+
+/* ---------------- Content routes ---------------- */
+export const validateContentBlock = [
+  body('page_key').isLength({ min: 2, max: 50 }).withMessage('page_key is required'),
+  body('section_key').isLength({ min: 2, max: 50 }).withMessage('section_key is required'),
+  body('title').isLength({ min: 2, max: 120 }).withMessage('title is required'),
+  body('body').isLength({ min: 5, max: 5000 }).withMessage('body is required'),
+  body('style').optional().isIn(['card', 'accordion']).withMessage('Invalid style'),
+  body('order_index').optional().isInt({ min: 0 }).withMessage('order_index must be >= 0')
 ];

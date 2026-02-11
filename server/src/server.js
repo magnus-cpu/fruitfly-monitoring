@@ -3,20 +3,29 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.routes.js';
 import sensor from './routes/sensor.routes.js';
 import gateway from './routes/gateway.routes.js'
 import environmentalData from './routes/environmentalData.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import userRoutes from './routes/user.routes.js';
+import contentRoutes from './routes/content.routes.js';
 import { initDB } from './config/database.js';
 import imageData from './routes/imageData.routes.js';
-import countsData from './routes/countsData.routes.js'
+import countsData from './routes/countsData.routes.js';
+import dashboardData from './routes/dashboardData.routes.js'
+import data from './routes/data.routes.js'
 
 dotenv.config();
 
 const app = express();
 const MAX_PAYLOAD_SIZE = '50mb';
+
+// Resolve paths for static hosting
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 (async () => {
   await initDB(); // Run schema.sql on startup
@@ -28,15 +37,15 @@ app.use(helmet());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 20 * 1000, // 15 minutes
+  max: 1000 // limit each IP to 100 requests per windowMs
 });
 app.use('/api/', limiter);
 
 // CORS configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://your-domain.com']
+    ? ['https://trapiq.co.tz']
     : ['http://localhost:5173', 'http://192.168.137.1:5173'],
   credentials: true,
   optionsSuccessStatus: 200
@@ -62,10 +71,22 @@ app.use('/api/auth', authRoutes);
 app.use('/api/sensors', sensor);
 app.use('/api/gateways', gateway)
 app.use('/api/fruitfly', environmentalData);
+app.use('/api/fruitfly', data);
 app.use('/api/fruitfly', imageData);
 app.use('/api/fruitfly', countsData);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/locations', dashboardData);
+app.use('/api/content', contentRoutes);
+
+// Serve frontend build (Vite)
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
+// SPA fallback for client-side routes (exclude /api)
+app.get(/^(?!\/api\/).*/, (req, res) => {
+  res.sendFile(path.join(clientDistPath, 'index.html'));
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

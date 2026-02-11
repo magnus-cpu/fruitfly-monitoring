@@ -54,7 +54,8 @@ export const createNode = async (req, res) => {
       });
     }
 
-    const { name, gateway_id, location, location_lat, location_lng, description } = req.body;
+    const gateway_id = req.params.id
+    const { name, location, location_lat, location_lng, description } = req.body;
 
     // Verify gateway exists and belongs to user
     const [gatewayRows] = await db.execute(
@@ -115,11 +116,11 @@ export const updateNode = async (req, res) => {
       });
     }
 
-    const { name, description, location, location_lat, location_lng, status } = req.body;
+    const { name, description, location, location_lat, location_lng } = req.body;
 
     const [result] = await db.execute(
-      'UPDATE sensors SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ?, status = ? WHERE id = ? AND user_id = ?',
-      [name, description, location, location_lat, location_lng, status, req.params.id, req.user.id]
+      'UPDATE sensors SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ? WHERE id = ? AND user_id = ?',
+      [name, description, location, location_lat, location_lng, req.params.id, req.user.id]
     );
 
     if (result.affectedRows === 0) {
@@ -160,6 +161,21 @@ export const getSensors = async (req, res) => {
     const [sensors] = await db.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE user_id = ? ORDER BY created_at DESC',
       [req.user.id]
+    );
+
+    res.json(sensors);
+  } catch (error) {
+    console.error('Error fetching sensors:', error);
+    res.status(500).json({ message: 'Failed to fetch sensors' });
+  }
+};
+
+//  Get all sensors for authenticated user for that gateway
+export const getNodeSensors = async (req, res) => {
+  try {
+    const [sensors] = await db.execute(
+      'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE user_id = ? AND gateway_id = ? ORDER BY created_at DESC',
+      [req.user.id, req.params.id]
     );
 
     res.json(sensors);

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import axios from 'axios';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { Sensor } from '../types/sensorTypes';
-import type { SetMapViewProps, FlyToMarkerProps } from '../types/mapTypes';
+import api from '../api/Sapi';
+import { useNavigate } from 'react-router-dom';
 
 
 interface SensorData {
@@ -13,153 +13,261 @@ interface SensorData {
     created_at: string;
 }
 
-const SetMapView: React.FC<SetMapViewProps> = ({ lat, lng, zoom = 12 }) => {
+interface SensorProperties {
+    id: number;
+    name: string;
+    location: string;
+    entity: 'sensor' | 'gateway';
+    gateway_id?: number;
+    temp?: number;
+    humidity?: number;
+    insects?: number;
+    activity_status?: 'active' | 'inactive' | string;
+}
+
+interface GeoFeature {
+    type: 'Feature';
+    properties: SensorProperties;
+    geometry: {
+        type: 'Point';
+        coordinates: [number, number];
+    };
+}
+
+interface GeoJSONData {
+    type: 'FeatureCollection';
+    features: GeoFeature[];
+}
+
+const activeIcon = new L.Icon({
+    iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/green-dot.png',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
+});
+
+const inactiveIcon = new L.Icon({
+    iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/grey-dot.png',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
+});
+
+const gatewayIcon = new L.Icon({
+    iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36],
+});
+
+const FitToLocations: React.FC<{ features: GeoFeature[] }> = ({ features }) => {
     const map = useMap();
+    const hasFit = useRef(false);
 
     useEffect(() => {
-        if (lat && lng) {
-            map.setView([lat, lng], zoom);
-        }
-    }, [lat, lng, zoom, map]);
+        if (!features.length || hasFit.current) return;
+
+        const bounds = L.latLngBounds(
+            features.map(s => [s.geometry.coordinates[1], s.geometry.coordinates[0]])
+        );
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 7 });
+        hasFit.current = true;
+    }, [features, map]);
 
     return null;
 };
 
-
-const FlyToMarker: React.FC<FlyToMarkerProps> = ({ lat, lng }) => {
+const FlyToSelected: React.FC<{ point: [number, number] | null }> = ({ point }) => {
     const map = useMap();
 
-    // Smooth fly animation to the marker
-    map.flyTo([lat, lng], 16, {
-        duration: 1.5,
-    });
+    useEffect(() => {
+        if (!point) return;
+        const currentZoom = map.getZoom();
+        map.flyTo(point, Math.max(currentZoom, 12), {
+            animate: true,
+            duration: 0.9,
+        });
+    }, [point, map]);
 
-    return null; // no UI, only behavior
+    return null;
 };
 
-
-/* optional coloured fruit-fly icon */
-// const flyIcon = new Icon({
-//     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2936/2936886.png',
-//     // iconSize: [32, 32],
-// });
-
 const MapView: React.FC = () => {
-    const [sensors, setSensors] = useState<Sensor[]>([]);
-    const [sensorData, setSensorData] = useState<SensorData[]>([]);
-
+    const [geoData, setGeoData] = useState<GeoJSONData | null>(null);
+    const [latestBySensor, setLatestBySensor] = useState<Record<number, SensorData | null>>({});
+    const [selectedPoint, setSelectedPoint] = useState<[number, number] | null>(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        axios.get('http://localhost:5000/api/sensors').then(({ data }) => setSensors(data));
+        const loadLocations = async () => {
+            try {
+                const { data } = await api.get('/locations');
+                setGeoData(data);
+            } catch (error) {
+                console.error('Failed to load locations', error);
+            }
+        };
+        loadLocations();
+    }, []);
+
+    const refreshLatest = useCallback(async (sensorList: Array<{ id: number }>) => {
+        return Promise.all(
+            sensorList.map(async (sensor) => {
+                try {
+                    const response = await api.get(`/sensor-data/${sensor.id}/data`);
+                    const latest = response.data?.[response.data.length - 1] ?? null;
+                    return [sensor.id, latest] as const;
+                } catch (error) {
+                    console.error(`Failed to load data for sensor ${sensor.id}`, error);
+                    return [sensor.id, null] as const;
+                }
+            })
+        );
     }, []);
 
     useEffect(() => {
-        const fetchData = async (sensorId: number) => {
-            const response = await axios.get(`http://localhost:5000/api/sensor-data/${sensorId}/data`);
-            setSensorData(response.data);
+        const sensorFeatures = geoData?.features.filter(
+            f => f.properties.entity === 'sensor'
+        ) ?? [];
+        if (!sensorFeatures.length) return;
+        let cancelled = false;
+
+        const fetchLatest = async () => {
+            const entries = await refreshLatest(
+                sensorFeatures.map(f => ({
+                    id: f.properties.id
+                }))
+            );
+            if (!cancelled) {
+                setLatestBySensor(Object.fromEntries(entries));
+            }
         };
 
-        if (sensors.length > 0) {
-            fetchData(sensors[0].id);
-        }
-    }, [sensors]);
+        fetchLatest();
+        const interval = window.setInterval(fetchLatest, 20000);
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [geoData, refreshLatest]);
+
+    const features = geoData?.features ?? [];
+    const sensorFeatures = features.filter(
+        f => f.properties.entity === 'sensor'
+    );
+    const gatewayById = useMemo(() => {
+        const entries = features
+            .filter(f => f.properties.entity === 'gateway')
+            .map(f => [f.properties.id, f] as const);
+        return Object.fromEntries(entries) as Record<number, GeoFeature>;
+    }, [features]);
 
     return (
         <div className="h-screen w-screen">
             <MapContainer
-                center={[-37.8136, 144.9631]}   // Melbourne – change to your area
-                zoom={10}
-                scrollWheelZoom={true}
+                center={[-37.8136, 144.9631]}
+                zoom={6}
+                scrollWheelZoom
                 className="h-full w-full"
             >
                 <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; OpenStreetMap contributors'
                     maxZoom={22}
                 />
-                {/* Auto zoom to first sensor */}
-                {sensors.length > 0 && (
-                    <SetMapView
-                        lat={sensors[0].location_lat}
-                        lng={sensors[0].location_lng}
-                        zoom={6}
-                    />
+
+                {features.length > 0 && (
+                    <>
+                        <FitToLocations features={features} />
+                        <FlyToSelected point={selectedPoint} />
+                    </>
                 )}
 
-                {sensors.map((s) => (
-                    <Marker
-                        key={s.id}
-                        position={[s.location_lat, s.location_lng]}
-                    // icon={flyIcon}
-                    >
-                        <Popup>
-                            <div>
-                                <b>{s.name}</b>
-                                <br />
-                                {s.location}
-                                <br />
-                                Status:{" "}
-                                <span
-                                    className={`font-semibold ${s.status === "active" ? "text-green-600" : "text-red-600"
-                                        }`}
-                                >
-                                    {s.status}
-                                </span>
-
-                                <br />
-
-                                {sensorData.length > 0 && (() => {
-                                    const latest = sensorData[sensorData.length - 1];
-                                    const temp = latest.temperature;
-                                    const hum = latest.humidity;
-
-                                    // Temperature color and message
-                                    let tempColor = "text-green-600";
-                                    let tempLabel = "Ideal";
-
-                                    if (temp < 18) {
-                                        tempColor = "text-blue-500";
-                                        tempLabel = "Cold";
-                                    } else if (temp > 30) {
-                                        tempColor = "text-red-600";
-                                        tempLabel = "Hot";
-                                    }
-
-                                    // Humidity color and message
-                                    let humColor = "text-green-600";
-                                    let humLabel = "Comfortable";
-
-                                    if (hum < 40) {
-                                        humColor = "text-yellow-600";
-                                        humLabel = "Dry";
-                                    } else if (hum > 70) {
-                                        humColor = "text-blue-700";
-                                        humLabel = "Humid";
-                                    }
-
-                                    return (
+                {features.map((feature) => {
+                    const { properties, geometry } = feature;
+                    const latest = properties.entity === 'sensor'
+                        ? latestBySensor[properties.id] ?? null
+                        : null;
+                    const status = properties.activity_status ?? 'inactive';
+                    const temp = latest?.temperature ?? properties.temp;
+                    const hum = latest?.humidity ?? properties.humidity;
+                    const icon = properties.entity === 'gateway'
+                        ? gatewayIcon
+                        : (status === 'active' ? activeIcon : inactiveIcon);
+                    return (
+                        <Marker
+                            key={properties.id}
+                            position={[geometry.coordinates[1], geometry.coordinates[0]]}
+                            icon={icon}
+                            eventHandlers={{
+                                click: () => setSelectedPoint([geometry.coordinates[1], geometry.coordinates[0]]),
+                            }}
+                        >
+                            <Popup>
+                                <div className="min-w-[180px]">
+                                    <b className="text-slate-800">{properties.name}</b>
+                                    <p className="text-xs text-slate-500 mt-1">{properties.location}</p>
+                                    {properties.entity === 'gateway' ? (
+                                        <div className="mt-2 space-y-2">
+                                            <p className="text-xs text-slate-600">Gateway node</p>
+                                            <button
+                                                onClick={() => navigate(`/gateways/${properties.id}/sensors`)}
+                                                className="text-xs font-semibold text-blue-600 hover:text-blue-500"
+                                            >
+                                                View data
+                                            </button>
+                                        </div>
+                                    ) : (
                                         <>
-                                            🌡️ Temp:{" "}
-                                            <b className={tempColor}>
-                                                {temp}°C ({tempLabel})
-                                            </b>
-                                            <br />
-                                            💧 Humidity:{" "}
-                                            <b className={humColor}>
-                                                {hum}% ({humLabel})
-                                            </b>
-                                            <br />
-                                            ⌛ Last updated:{" "}
-                                            {new Date(sensorData[0]?.created_at).toLocaleString()}
+                                            <p className="text-xs mt-2">
+                                                Status:{' '}
+                                                <span
+                                                    className={`font-semibold ${status === 'active' ? 'text-emerald-600' : 'text-rose-600'
+                                                        }`}
+                                                >
+                                                    {status}
+                                                </span>
+                                            </p>
+                                            {(temp !== undefined || hum !== undefined) && (
+                                                <div className="text-xs text-slate-600 mt-2">
+                                                    {temp !== undefined && <div>🌡️ {temp}°C</div>}
+                                                    {hum !== undefined && <div>💧 {hum}%</div>}
+                                                    {latest?.created_at && (
+                                                        <div>
+                                                            ⌛ {new Date(latest.created_at).toLocaleString()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </>
-                                    );
-                                })()}
+                                    )}
+                                </div>
+                            </Popup>
+                        </Marker>
+                    );
+                })}
 
-                                <FlyToMarker lat={s.location_lat} lng={s.location_lng} />
-                            </div>
-                        </Popup>
-
-                    </Marker>
-                ))}
+                {sensorFeatures.map((sensor) => {
+                    const gateway = sensor.properties.gateway_id
+                        ? gatewayById[sensor.properties.gateway_id]
+                        : null;
+                    if (!gateway) return null;
+                    const sensorPoint: [number, number] = [
+                        sensor.geometry.coordinates[1],
+                        sensor.geometry.coordinates[0],
+                    ];
+                    const gatewayPoint: [number, number] = [
+                        gateway.geometry.coordinates[1],
+                        gateway.geometry.coordinates[0],
+                    ];
+                    return (
+                        <Polyline
+                            key={`link-${sensor.properties.id}-${gateway.properties.id}`}
+                            positions={[gatewayPoint, sensorPoint]}
+                            pathOptions={{ color: '#94a3b8', weight: 2, opacity: 0.7 }}
+                        />
+                    );
+                })}
             </MapContainer>
         </div>
     );

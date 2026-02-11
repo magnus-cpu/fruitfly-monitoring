@@ -75,6 +75,7 @@ export const createGateWay = async (req, res) => {
         });
     }
 };
+
 // Update Gateway
 export const updateGateway = async (req, res) => {
     try {
@@ -86,11 +87,11 @@ export const updateGateway = async (req, res) => {
             });
         }
 
-        const { name, description, location, location_lat, location_lng, status } = req.body;
+        const { name, description, location, location_lat, location_lng } = req.body;
 
         const [result] = await db.execute(
-            'UPDATE gateways SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ?, status = ? WHERE id = ? AND user_id = ?',
-            [name, description, location, location_lat, location_lng, status, req.params.id, req.user.id]
+            'UPDATE gateways SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ? WHERE id = ? AND user_id = ?',
+            [name, description, location, location_lat, location_lng, req.params.id, req.user.id]
         );
 
         if (result.affectedRows === 0) {
@@ -107,6 +108,17 @@ export const updateGateway = async (req, res) => {
 // Delete gateway
 export const deleteGateway = async (req, res) => {
     try {
+        const [sensors] = await db.execute(
+            'SELECT id FROM sensors WHERE gateway_id = ?',
+            [req.params.id]
+        );
+
+        if (sensors.length > 0) {
+            return res.status(400).json({
+                message: 'Cannot delete gateway with attached sensors'
+            });
+        }
+
         const [result] = await db.execute(
             'DELETE FROM gateways WHERE id = ? AND user_id = ?',
             [req.params.id, req.user.id]
@@ -128,48 +140,84 @@ export const deleteGateway = async (req, res) => {
 
 // Get all Gateways for authenticated user
 export const getGateways = async (req, res) => {
-  try {
-    const [gateways] = await db.execute(
-      'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE user_id = ? ORDER BY created_at DESC',
-      [req.user.id]
-    );
+    try {
+        const [gateways] = await db.execute(
+            'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE user_id = ? ORDER BY created_at DESC',
+            [req.user.id]
+        );
 
-    res.json(gateways);
-  } catch (error) {
-    console.error('Error fetching gateways:', error);
-    res.status(500).json({ message: 'Failed to fetch gateways' });
-  }
+        res.json(gateways);
+    } catch (error) {
+        console.error('Error fetching gateways:', error);
+        res.status(500).json({ message: 'Failed to fetch gateways' });
+    }
 };
 
 //get all Gateways for admin
 export const getAllGateways = async (req, res) => {
-  try {
-    const [gateways] = await db.execute(
-      'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways ORDER BY created_at DESC'
-    );
+    try {
+        const [gateways] = await db.execute(
+            'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways ORDER BY created_at DESC'
+        );
 
-    res.json(gateways);
-  } catch (error) {
-    console.error('Error fetching gateways:', error);
-    res.status(500).json({ message: 'Failed to fetch gateways' });
-  }
+        res.json(gateways);
+    } catch (error) {
+        console.error('Error fetching gateways:', error);
+        res.status(500).json({ message: 'Failed to fetch gateways' });
+    }
 };
 
 // Get single Gateway
 export const getGatewayById = async (req, res) => {
-  try {
-    const [gateways] = await db.execute(
-      'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
-    );
+    try {
+        const [gateways] = await db.execute(
+            'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE id = ? AND user_id = ?',
+            [req.params.id, req.user.id]
+        );
 
-    if (gateways.length === 0) {
-      return res.status(404).json({ message: 'Gateway not found' });
+        if (gateways.length === 0) {
+            return res.status(404).json({ message: 'Gateway not found' });
+        }
+
+        res.json(gateways[0]);
+    } catch (error) {
+        console.error('Error fetching Gateway:', error);
+        res.status(500).json({ message: 'Failed to fetch Gateway' });
     }
+};
 
-    res.json(gateways[0]);
-  } catch (error) {
-    console.error('Error fetching Gateway:', error);
-    res.status(500).json({ message: 'Failed to fetch Gateway' });
-  }
+export const getGatewaysData = async (req, res) => {
+    try {
+        // 1️⃣ Get gateway
+        const [gateways] = await db.execute(
+            `SELECT id, name, serial_number, description, location,
+              location_lat, location_lng, status, created_at
+       FROM gateways
+       WHERE id = ? AND user_id = ?`,
+            [req.params.id, req.user.id]
+        );
+
+        if (gateways.length === 0) {
+            return res.status(404).json({ message: 'Gateway not found' });
+        }
+
+        // 2️⃣ Get sensors for this gateway
+        const [sensors] = await db.execute(
+            `SELECT id, name, serial_number, description, location,
+              location_lat, location_lng, status, created_at
+       FROM sensors
+       WHERE gateway_id = ? AND user_id = ?`,
+            [req.params.id, req.user.id]
+        );
+
+        // 3️⃣ Combine data properly
+        res.json({
+            gateway: gateways[0],
+            sensors,
+        });
+
+    } catch (error) {
+        console.error('Error fetching Gateway Data:', error);
+        res.status(500).json({ message: 'Failed to fetch Gateway Data' });
+    }
 };

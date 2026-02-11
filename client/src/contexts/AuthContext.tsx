@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { User } from './types';
 import { AuthContext } from './AuthDefinitions';
+import api from '../api/Sapi';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -10,17 +11,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       // ✅ Optionally verify token with backend
-      axios.get('http://localhost:5000/api/auth/me')
+      api.get('/auth/me')
         .then(res => {
           setUser(res.data.user);
         })
         .catch(() => {
           // If token is invalid/expired, remove it
           localStorage.removeItem('token');
-          delete axios.defaults.headers.common['Authorization'];
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -30,23 +29,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await axios.post('http://localhost:5000/api/auth/login', {
-      email,
-      password,
-    });
+    try {
 
-    const { token, user } = response.data;
-    localStorage.setItem('token', token);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(user);
+      const response = await api.post('/auth/login', {
+        email,
+        password,
+      } );
+
+      const { token, user } = response.data;
+
+      localStorage.setItem('token', token);
+      setUser(user);
+
+    } catch (err) {
+      console.error(err);
+    }
+
   };
 
   const register = async (username: string, email: string, password: string) => {
-    await axios.post('http://localhost:5000/api/auth/register', {
-      username,
-      email,
-      password,
-    });
+    try {
+      await api.post('/auth/register', {
+        username,
+        email,
+        password,
+      });
+
+    } catch (err) {
+      console.error(err);
+    }
+
   };
 
   const logout = () => {

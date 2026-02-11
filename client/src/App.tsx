@@ -11,12 +11,13 @@ import Sensors from './pages/Sensors';
 import MapView from './pages/MapView';
 import Profile from './pages/Profile';
 import GateWays from './pages/gateways';
+import AdminContent from './pages/AdminContent';
+import Footer from './components/Footer';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen bg-gray-100">
           <Navbar />
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -46,7 +47,7 @@ function App() {
               }
             />
             <Route
-              path="/sensors"
+              path="/gateways/:id/sensors"
               element={
                 <ProtectedRoute>
                   <Sensors />
@@ -69,9 +70,17 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/content"
+              element={
+                <ProtectedRoute>
+                  <AdminContent />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </div>
+          <Footer />
       </Router>
     </AuthProvider>
   );
