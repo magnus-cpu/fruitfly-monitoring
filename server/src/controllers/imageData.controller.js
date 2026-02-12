@@ -19,11 +19,11 @@ const sanitizeBase64 = (base64) => {
 };
 
 export const processImageData = async (req, res) => {
-    const { serial_number, counts, time_taken, base64 } = req.body;
+    const { serial_number, fruitfly_count, time_taken, base64 } = req.body;
 
-    if (counts === undefined || typeof counts !== 'number' || !base64) {
+    if (fruitfly_count === undefined || typeof fruitfly_count !== 'number' || !base64) {
         return res.status(400).json({
-            message: 'Invalid request. Required: {counts: number, time_taken: string, base64: string}'
+            message: 'Invalid request. Required: {fruitfly_count: number, time_taken: string, base64: string}'
         });
     }
 
@@ -61,7 +61,7 @@ export const processImageData = async (req, res) => {
        // Update image_id in fruitfly_counts table
         await pool.execute(
             'UPDATE fruitfly_counts SET image_id = ? WHERE sensor_id = ? AND time_taken = ? AND fruitfly_count = ?',
-            [result.insertId, sensorId, time_taken, counts]
+            [result.insertId, sensorId, time_taken, fruitfly_count]
         );
 
        res.status(201).json({
@@ -70,7 +70,7 @@ export const processImageData = async (req, res) => {
             message: 'Data processed successfully',
             filename: fileName,
             path: filePath,
-            counts: counts,
+            counts: fruitfly_count,
             timestamp: time_taken || new Date().toISOString()
         });
 

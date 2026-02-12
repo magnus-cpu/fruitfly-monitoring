@@ -3,6 +3,6 @@ import { storeEnvironmentalData } from '../controllers/environmentalData.control
 
 const router = express.Router();
 
-router.post('/data', storeEnvironmentalData);
+router.post('/env-data', storeEnvironmentalData);
 
 export default router;

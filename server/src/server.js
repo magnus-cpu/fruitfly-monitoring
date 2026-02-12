@@ -105,10 +105,10 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/sensors', sensor);
 app.use('/api/gateways', gateway)
-app.use('/api/fruitfly', environmentalData);
+app.use('/api/device', environmentalData);
 app.use('/api/fruitfly', data);
-app.use('/api/fruitfly', imageData);
-app.use('/api/fruitfly', countsData);
+app.use('/api/device', imageData);
+app.use('/api/device', countsData);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', dashboardData);
