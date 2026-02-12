@@ -19,11 +19,11 @@ const sanitizeBase64 = (base64) => {
 };
 
 export const processImageData = async (req, res) => {
-    const { serial_number, counts, date_time, base64 } = req.body;
+    const { serial_number, counts, time_taken, base64 } = req.body;
 
     if (counts === undefined || typeof counts !== 'number' || !base64) {
         return res.status(400).json({
-            message: 'Invalid request. Required: {counts: number, date_time: string, base64: string}'
+            message: 'Invalid request. Required: {counts: number, time_taken: string, base64: string}'
         });
     }
 
@@ -54,14 +54,14 @@ export const processImageData = async (req, res) => {
         // Insert into fruitfly_images table
         const [result] = await pool.execute(
             'INSERT INTO fruitfly_images (sensor_id, image_path, analysis_status, time_captured) VALUES (?, ?, ?, ?)',
-            [sensorId, filePath, 'pending', date_time]
+            [sensorId, filePath, 'pending', time_taken]
         );
 
 
        // Update image_id in fruitfly_counts table
         await pool.execute(
             'UPDATE fruitfly_counts SET image_id = ? WHERE sensor_id = ? AND time_taken = ? AND fruitfly_count = ?',
-            [result.insertId, sensorId, date_time, counts]
+            [result.insertId, sensorId, time_taken, counts]
         );
 
        res.status(201).json({
@@ -71,7 +71,7 @@ export const processImageData = async (req, res) => {
             filename: fileName,
             path: filePath,
             counts: counts,
-            timestamp: date_time || new Date().toISOString()
+            timestamp: time_taken || new Date().toISOString()
         });
 
     } catch (error) {
