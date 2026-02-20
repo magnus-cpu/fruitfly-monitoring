@@ -17,6 +17,7 @@ import imageData from './routes/imageData.routes.js';
 import countsData from './routes/countsData.routes.js';
 import dashboardData from './routes/dashboardData.routes.js'
 import data from './routes/data.routes.js'
+import systemTelemetry from './routes/systemTelemetry.routes.js';
 import pool from './config/database.js';
 
 dotenv.config();
@@ -109,6 +110,7 @@ app.use('/api/device', environmentalData);
 app.use('/api/fruitfly', data);
 app.use('/api/device', imageData);
 app.use('/api/device', countsData);
+app.use('/api/device', systemTelemetry);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', dashboardData);
