@@ -72,7 +72,7 @@ const Login: React.FC = () => {
               Intelligent FruitFly Monitoring that Maximizes Yield and Safeguards Your Reputation.
             </h1>
             <p className="mt-4 text-white/70 text-base md:text-lg">
-              Seamlessly connect gateways and field sensors to unlock real-time insights on insect infestations, humidity, and temperature—empowering your team to act decisively before damage occurs.
+              Seamlessly connect gateways and field sensors to unlock real-time insights on insect infestations, humidity, and temperature. Receive instant image-based insect counts and empower your team to act decisively before damage occurs. Enhanced AI models deliver accurate insect identification and population forecasting, keeping you one step ahead of infestations to protect your crops.
             </p>
             <div className="mt-6 grid gap-3 text-sm text-white/85">
               <div className="flex items-center gap-2">
