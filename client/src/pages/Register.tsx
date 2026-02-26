@@ -74,18 +74,25 @@ const Register: React.FC = () => {
     >
       <div className="min-h-screen grid lg:grid-cols-2">
         <section className="relative overflow-hidden flex items-center justify-center p-8 lg:p-14">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#6d3f27_0%,#3d2418_35%,#1a0f0a_70%)]" />
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage:
+                "url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=1200&auto=format&fit=crop')",
+            }}
+          />
+          <div className="absolute inset-0 bg-black/45" />
           <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-amber-300/20 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-orange-400/20 blur-3xl" />
 
-          <div className="relative z-10 max-w-lg text-white">
+          <div className="relative z-10 max-w-lg text-white/75">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs uppercase tracking-[0.2em]">
               FruitFly Platform
             </div>
-            <h1 className="mt-5 text-4xl md:text-5xl font-black leading-tight">
+            <h1 className="mt-5 text-4xl md:text-5xl font-black leading-tight text-white/80">
               Turn field data into confident decisions.
             </h1>
-            <p className="mt-4 text-white/80 text-base md:text-lg">
+            <p className="mt-4 text-white/70 text-base md:text-lg">
               Deploy gateways and sensors to track environmental changes and pest activity in real time.
               Reduce loss, document interventions, and improve seasonal outcomes.
             </p>
@@ -103,16 +110,8 @@ const Register: React.FC = () => {
                 Export reports for compliance and growers.
               </div>
             </div>
-
-            <div className="mt-8 rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-white/5">
-              <img
-                src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=1200&auto=format&fit=crop"
-                alt="Farm landscape"
-                className="h-56 w-full object-cover"
-              />
-            </div>
           </div>
-          <div className="pointer-events-none absolute top-0 right-0 h-full w-24 hidden lg:block">
+          <div className="pointer-events-none absolute top-0 -right-px h-full w-24 hidden lg:block">
             <svg viewBox="0 0 120 1000" preserveAspectRatio="none" className="h-full w-full">
               <path
                 d="M0,0 C70,120 70,880 0,1000 L120,1000 L120,0 Z"

@@ -56,44 +56,40 @@ const Login: React.FC = () => {
     >
       <div className="min-h-screen grid lg:grid-cols-2">
         <section className="relative overflow-hidden flex items-center justify-center p-8 lg:p-14">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#1f6f5a_0%,#154235_35%,#0b1f1a_70%)]" />
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: "url('/mangoImage.jpg')" }}
+          />
+          <div className="absolute inset-0 bg-black/45" />
           <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-teal-400/20 blur-3xl" />
 
-            <div className="relative z-10 max-w-lg text-white">
+            <div className="relative z-10 max-w-lg text-white/75">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs uppercase tracking-[0.2em]">
-              🌾 Precision Agriculture
+             Precision Agriculture
             </div>
-            <h1 className="mt-5 text-4xl md:text-5xl font-black leading-tight">
+            <h1 className="mt-5 text-4xl md:text-5xl font-black leading-tight text-white/80">
               Intelligent FruitFly Monitoring that Maximizes Yield and Safeguards Your Reputation.
             </h1>
-            <p className="mt-4 text-white/80 text-base md:text-lg">
+            <p className="mt-4 text-white/70 text-base md:text-lg">
               Seamlessly connect gateways and field sensors to unlock real-time insights on insect infestations, humidity, and temperature—empowering your team to act decisively before damage occurs.
             </p>
             <div className="mt-6 grid gap-3 text-sm text-white/85">
               <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-300" />
-              ⚡ Instant alerts when fruit fly populations spike.
+               Instant alerts when fruit fly populations spike.
               </div>
               <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-300" />
-              🗺️ Comprehensive geo-mapping of assets and gateway coverage.
+               Comprehensive geo-mapping of assets and gateway coverage.
               </div>
               <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-300" />
-              ✓ Audit-ready reports for full compliance confidence.
+               Audit-ready reports for full compliance confidence.
               </div>
-            </div>
-
-            <div className="mt-8 rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-white/5">
-              <img
-                src="https://images.unsplash.com/photo-1472145246862-b24cf25c4a36?q=80&w=1200&auto=format&fit=crop"
-                alt="Orchard monitoring"
-                className="h-56 w-full object-cover"
-              />
             </div>
           </div>
-          <div className="pointer-events-none absolute top-0 right-0 h-full w-24 hidden lg:block">
+          <div className="pointer-events-none absolute top-0 -right-px h-full w-24 hidden lg:block">
             <svg viewBox="0 0 120 1000" preserveAspectRatio="none" className="h-full w-full">
               <path
                 d="M0,0 C70,120 70,880 0,1000 L120,1000 L120,0 Z"
