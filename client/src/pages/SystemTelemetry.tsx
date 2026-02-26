@@ -39,6 +39,33 @@ interface GatewayOption {
   serial_number: string;
 }
 
+const DISPLAY_TZ_OFFSET_HOURS = 3;
+
+const parseDbTimestamp = (value: string | null) => {
+  if (!value) return { date: '-', time: '-', full: '-' };
+  const normalized = value.replace('T', ' ').replace('Z', '').split('.')[0];
+  const [datePart = '', timePart = '00:00:00'] = normalized.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour = 0, minute = 0] = timePart.split(':').map(Number);
+
+  if (!year || !month || !day) return { date: '-', time: '-', full: '-' };
+
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute);
+  const shifted = new Date(utcMs + DISPLAY_TZ_OFFSET_HOURS * 60 * 60 * 1000);
+
+  const yyyy = shifted.getUTCFullYear();
+  const mm = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(shifted.getUTCDate()).padStart(2, '0');
+  const hh = String(shifted.getUTCHours()).padStart(2, '0');
+  const min = String(shifted.getUTCMinutes()).padStart(2, '0');
+
+  return {
+    date: `${yyyy}-${mm}-${dd}`,
+    time: `${hh}:${min}`,
+    full: `${yyyy}-${mm}-${dd} ${hh}:${min}`
+  };
+};
+
 const formatValue = (value: number | null, suffix: string) =>
   value === null || value === undefined ? 'N/A' : `${value}${suffix}`;
 
@@ -49,11 +76,12 @@ const SystemTelemetry: React.FC = () => {
   const [gateways, setGateways] = useState<GatewayOption[]>([]);
   const [reporterType, setReporterType] = useState<'all' | 'sensor' | 'gateway'>('all');
   const [selectedSerial, setSelectedSerial] = useState<string>('all');
+  const [rowLimit, setRowLimit] = useState<5 | 10 | 20>(10);
 
   const fetchTelemetry = async () => {
     try {
       setLoading(true);
-      const params: Record<string, string | number> = { limit: 100 };
+      const params: Record<string, string | number> = { limit: rowLimit };
 
       if (reporterType === 'sensor' && selectedSerial !== 'all') {
         params.sensor_serial_number = selectedSerial;
@@ -91,7 +119,7 @@ const SystemTelemetry: React.FC = () => {
 
   useEffect(() => {
     fetchTelemetry();
-  }, [reporterType, selectedSerial]);
+  }, [reporterType, selectedSerial, rowLimit]);
 
   const currentOptions = reporterType === 'sensor' ? sensors : reporterType === 'gateway' ? gateways : [];
 
@@ -121,18 +149,8 @@ const SystemTelemetry: React.FC = () => {
       [...rows]
         .reverse()
         .map((row) => ({
-          timeLabel: new Date(row.time_taken ?? row.created_at).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
-          fullDate: new Date(row.time_taken ?? row.created_at).toLocaleString([], {
-            weekday: 'short',
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
+          timeLabel: parseDbTimestamp(row.time_taken ?? row.created_at).time,
+          fullDate: parseDbTimestamp(row.time_taken ?? row.created_at).full,
           voltage: row.voltage,
           current: row.current,
           power: row.power,
@@ -192,6 +210,15 @@ const SystemTelemetry: React.FC = () => {
                 ))}
               </select>
             )}
+            <select
+              value={rowLimit}
+              onChange={(e) => setRowLimit(Number(e.target.value) as 5 | 10 | 20)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
+            >
+              <option value={5}>Latest 5</option>
+              <option value={10}>Latest 10</option>
+              <option value={20}>Latest 20</option>
+            </select>
             <button
               onClick={fetchTelemetry}
               className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-indigo-500 hover:text-indigo-600"
@@ -332,7 +359,7 @@ const SystemTelemetry: React.FC = () => {
                       {row.sensor_name ?? row.gateway_name ?? 'Unknown'}
                     </span>
                     <span className="text-xs text-slate-500">
-                      {new Date(row.time_taken ?? row.created_at).toLocaleString()}
+                      {parseDbTimestamp(row.time_taken ?? row.created_at).full}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
