@@ -90,12 +90,33 @@ export const getCombinedData = async (req, res) => {
       [sensorId]
     );
 
-    // 4️⃣ Return combined but independent data
+    // 4️⃣ Fetch last 5 system telemetry rows for this sensor
+    const [telemetryRows] = await pool.execute(
+      `
+      SELECT
+        id,
+        voltage,
+        current,
+        power,
+        signal_strength,
+        cpu_temp,
+        time_taken,
+        created_at
+      FROM system_telemetry
+      WHERE sensor_id = ?
+      ORDER BY created_at DESC
+      LIMIT 5
+      `,
+      [sensorId]
+    );
+
+    // 5️⃣ Return combined but independent data
     res.json({
       status: true,
       sensor_id: sensorId,
       environmental: envReadings,
       fruitfly: fruitflyCounts,
+      telemetry: telemetryRows,
     });
   } catch (error) {
     console.error('Error fetching combined sensor data:', error);

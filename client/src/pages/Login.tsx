@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { EyeOff, Eye } from 'lucide-react';
+import axios from 'axios';
+
+type ApiErrorResponse = {
+  message?: string;
+  errors?: Array<{ msg?: string }>;
+};
 
 const Login: React.FC = () => {
+  const location = useLocation();
+  const locationState = location.state as { message?: string } | null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState(locationState?.message ?? '');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -15,13 +24,25 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
 
     try {
       await login(email, password);
       navigate('/dashboard');
     } catch (error) {
-      setError('Invalid email or password');
+      if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        const fieldErrors = error.response?.data?.errors
+          ?.map((item) => item.msg)
+          .filter(Boolean);
+        if (fieldErrors && fieldErrors.length > 0) {
+          setError(fieldErrors.join(', '));
+        } else {
+          setError(error.response?.data?.message || 'Invalid email or password');
+        }
+      } else {
+        setError('Invalid email or password');
+      }
       console.error('Login error:', error);
     } finally {
       setLoading(false);
@@ -39,29 +60,28 @@ const Login: React.FC = () => {
           <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-teal-400/20 blur-3xl" />
 
-          <div className="relative z-10 max-w-lg text-white">
+            <div className="relative z-10 max-w-lg text-white">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs uppercase tracking-[0.2em]">
-              Precision Agriculture
+              🌾 Precision Agriculture
             </div>
             <h1 className="mt-5 text-4xl md:text-5xl font-black leading-tight">
-              FruitFly Monitoring that protects yield and reputation.
+              Intelligent FruitFly Monitoring that Maximizes Yield and Safeguards Your Reputation.
             </h1>
             <p className="mt-4 text-white/80 text-base md:text-lg">
-              We connect gateways and field sensors to deliver live insect pressure, humidity, and
-              temperature insights so teams act before loss happens.
+              Seamlessly connect gateways and field sensors to unlock real-time insights on insect infestations, humidity, and temperature—empowering your team to act decisively before damage occurs.
             </p>
             <div className="mt-6 grid gap-3 text-sm text-white/85">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                Live alerts for rising fruit fly counts.
+              <span className="h-2 w-2 rounded-full bg-emerald-300" />
+              ⚡ Instant alerts when fruit fly populations spike.
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                Geo-mapped assets and gateway coverage.
+              <span className="h-2 w-2 rounded-full bg-emerald-300" />
+              🗺️ Comprehensive geo-mapping of assets and gateway coverage.
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                Reports ready for compliance and audits.
+              <span className="h-2 w-2 rounded-full bg-emerald-300" />
+              ✓ Audit-ready reports for full compliance confidence.
               </div>
             </div>
 
@@ -94,6 +114,11 @@ const Login: React.FC = () => {
               {error && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded mb-4 text-sm">
                   {error}
+                </div>
+              )}
+              {message && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded mb-4 text-sm">
+                  {message}
                 </div>
               )}
 

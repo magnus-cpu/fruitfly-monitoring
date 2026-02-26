@@ -15,9 +15,10 @@ import {
   Database,
   Search,
   Bug,
-  Calendar
+  Calendar,
+  ImageIcon
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../api/Sapi';
 import {
   XAxis,
@@ -51,15 +52,26 @@ const Sensors: React.FC = () => {
   // --- State ---
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [gateway, setGateway] = useState<Gateway | null>(null);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+  const [autoFetchEnabled, setAutoFetchEnabled] = useState(true);
+  const [autoFetchMinutes, setAutoFetchMinutes] = useState(10);
   const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
   const [envData, setEnvData] = useState<Environmental[]>([]);
   const [fruitflyData, setFruitflyData] = useState<Fruitfly[]>([]);
   const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([]);
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
   const gatewayId = Number(id);
+  const sensorIdParam = searchParams.get('sensorId');
+  const preselectedSensorId = sensorIdParam ? Number(sensorIdParam) : null;
 
   const [loading, setLoading] = useState({
     gateways: false,
@@ -71,6 +83,16 @@ const Sensors: React.FC = () => {
   const onBack = () => {
     navigate(-1);
   };
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) setIsOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // --- Data Transformation for Charts (Daily view) ---
   const fruitflyChart = useMemo(
@@ -144,6 +166,10 @@ const Sensors: React.FC = () => {
   }, [fetchSensors]);
 
   useEffect(() => {
+    setDeepLinkHandled(false);
+  }, [preselectedSensorId]);
+
+  useEffect(() => {
     api.get('/content', { params: { page: 'sensors' } })
       .then((res) => setContentBlocks(res.data))
       .catch((err) => console.error('Failed to load sensors info', err));
@@ -152,11 +178,22 @@ const Sensors: React.FC = () => {
   useEffect(() => {
     if (!selectedSensor) return;
     fetchSensorData(selectedSensor.serial_number);
+    if (!autoFetchEnabled) return;
     const interval = setInterval(() => {
       fetchSensorData(selectedSensor.serial_number, true);
-    }, 600000); // 10 minutes
+    }, autoFetchMinutes * 60_000);
     return () => clearInterval(interval);
-  }, [selectedSensor, fetchSensorData]);
+  }, [selectedSensor, fetchSensorData, autoFetchEnabled, autoFetchMinutes]);
+
+  useEffect(() => {
+    if (deepLinkHandled || !preselectedSensorId || sensors.length === 0) return;
+
+    const matchedSensor = sensors.find((sensor) => sensor.id === preselectedSensorId);
+    if (matchedSensor) {
+      setSelectedSensor(matchedSensor);
+    }
+    setDeepLinkHandled(true);
+  }, [sensors, preselectedSensorId, deepLinkHandled]);
 
   const getStatusColor = (status?: string): string => {
     switch (status?.toLowerCase()) {
@@ -223,20 +260,38 @@ const Sensors: React.FC = () => {
     return null;
   };
 
+  const handleFetchNow = () => {
+    if (!selectedSensor) return;
+    fetchSensorData(selectedSensor.serial_number, true);
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-100 min-w-screen">
+      {isMobile && isOpen && (
+        <button
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-900/25 backdrop-blur-[1px]"
+          aria-label="Close sensor list"
+        />
+      )}
+
       {/* --- SIDEBAR --- */}
       <nav
-        className={`fixed left-0  h-full  bg-white/80 border-r border-slate-200 shadow-sm transition-all duration-300 ease-in-out z-50 flex flex-col
-           ${isOpen ? 'w-80' : 'w-16'}`}
+        className={`fixed left-0 h-full bg-white/95 border-r border-slate-200 shadow-sm transition-all duration-300 ease-in-out z-50 flex flex-col
+           ${isMobile
+            ? `w-72 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+            : isOpen ? 'w-80' : 'w-28'
+          }`}
       >
         {/* Toggle Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="absolute -right-3 top-17 bg-indigo-600 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform z-50"
-        >
-          {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="absolute -right-3 top-17 bg-indigo-600 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform z-50"
+          >
+            {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+          </button>
+        )}
 
         {/* Sidebar Header */}
         <div className="p-3 border-b border-slate-100 flex items-center gap-3 h-20">
@@ -291,7 +346,7 @@ const Sensors: React.FC = () => {
                     <Wind size={18} />
                   </div>
 
-                  {isOpen && (
+                  {isOpen ? (
                     <div className="flex-1 text-left min-w-0">
                       <div className="flex justify-between items-center mb-0.5">
                         <span className="font-bold text-sm truncate">{sensor.name}</span>
@@ -300,6 +355,12 @@ const Sensors: React.FC = () => {
                       <div className="flex items-center gap-1 text-[10px] text-slate-500">
                         <MapPin size={10} /> {sensor.location}
                       </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-w-0 text-left">
+                      <span className="block text-[11px] font-semibold leading-tight truncate">
+                        {sensor.name}
+                      </span>
                     </div>
                   )}
 
@@ -315,12 +376,23 @@ const Sensors: React.FC = () => {
 
       {/* --- MAIN CONTENT AREA --- */}
       <main
-        className={`flex-1 transition-all duration-300 ease-in-out ${isOpen ? 'ml-80' : 'ml-20'}`}
+        className={`flex-1 transition-all duration-300 ease-in-out ${isMobile ? 'ml-0' : isOpen ? 'ml-80' : 'ml-28'}`}
       >
-        <div className="p-6 md:p-10 max-w-6xl mx-auto">
+        <div className="p-4 sm:p-6 md:p-10 max-w-6xl mx-auto">
+          {isMobile && (
+            <div className="mb-4">
+              <button
+                onClick={() => setIsOpen(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold text-sm shadow-sm"
+              >
+                <ChevronRight size={16} className="rotate-180" />
+                Nodes
+              </button>
+            </div>
+          )}
 
           {/* Top Header / Breadcrumbs */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-5">
               <button
                 onClick={onBack}
@@ -350,7 +422,7 @@ const Sensors: React.FC = () => {
               </div>
             </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {loading.refreshing && (
                 <div className="bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-2 border border-indigo-100">
                   <RefreshCw size={14} className="text-indigo-600 animate-spin" />
@@ -358,12 +430,56 @@ const Sensors: React.FC = () => {
                 </div>
               )}
               <button
+                onClick={handleFetchNow}
+                disabled={!selectedSensor || loading.data || loading.refreshing}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-xs sm:text-sm hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              >
+                <Database size={15} />
+                Fetch Data
+              </button>
+              <button
+                onClick={() => setAutoFetchEnabled((prev) => !prev)}
+                disabled={!selectedSensor}
+                className={`flex items-center gap-2 px-3 py-2 border rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm active:scale-95 disabled:opacity-50 ${autoFetchEnabled
+                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'
+                  }`}
+              >
+                <Clock size={15} />
+                Auto {autoFetchEnabled ? 'On' : 'Off'}
+              </button>
+              <select
+                value={autoFetchMinutes}
+                onChange={(e) => setAutoFetchMinutes(Number(e.target.value))}
+                disabled={!autoFetchEnabled}
+                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 disabled:opacity-50"
+              >
+                <option value={1}>1 min</option>
+                <option value={5}>5 min</option>
+                <option value={10}>10 min</option>
+                <option value={15}>15 min</option>
+              </select>
+              <button
                 onClick={fetchSensors}
                 disabled={loading.sensors}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-xs sm:text-sm hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm active:scale-95 disabled:opacity-50"
               >
                 <RefreshCw size={16} className={loading.sensors ? 'animate-spin' : ''} />
                 Refresh
+              </button>
+              <button
+                onClick={() => navigate('/system-telemetry')}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-xs sm:text-sm hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm"
+              >
+                <Activity size={15} />
+                Telemetry
+              </button>
+              <button
+                onClick={() => navigate('/fruitfly-images')}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-xs sm:text-sm hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm"
+              >
+                <ImageIcon size={15} />
+                Images
               </button>
             </div>
           </div>
@@ -372,7 +488,7 @@ const Sensors: React.FC = () => {
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               {/* Sensor Identification Header */}
-              <div className="bg-indigo-900 text-white rounded-3xl p-8 relative overflow-hidden shadow-2xl shadow-indigo-200">
+              <div className="bg-indigo-900 text-white rounded-3xl p-5 sm:p-8 relative overflow-hidden shadow-2xl shadow-indigo-200">
                 <div className="absolute top-0 right-0 p-12 opacity-10">
                   <Activity size={70} />
                 </div>
@@ -381,49 +497,49 @@ const Sensors: React.FC = () => {
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Live Node Monitoring</span>
                   </div>
-                  <h2 className="text-3xl font-black">{selectedSensor.name}</h2>
-                  <p className="text-indigo-200 mt-2 max-w-xl text-sm leading-relaxed">{selectedSensor.description || 'Continuous environmental monitoring active for this node.'}</p>
+                  <h2 className="text-2xl sm:text-3xl font-black">{selectedSensor.name}</h2>
+                  <p className="text-indigo-200 mt-2 max-w-xl text-xs sm:text-sm leading-relaxed">{selectedSensor.description || 'Continuous environmental monitoring active for this node.'}</p>
                 </div>
               </div>
 
               {/* Big Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
 
-                <div className="group bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all">
+                <div className="group bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all min-h-[145px] sm:min-h-[180px]">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="p-4 bg-red-50 text-red-500 rounded-2xl group-hover:scale-110 transition-transform">
-                      <Bug size={32} />
+                    <div className="p-3 sm:p-4 bg-red-50 text-red-500 rounded-xl sm:rounded-2xl group-hover:scale-110 transition-transform">
+                      <Bug size={24} className="sm:w-8 sm:h-8" />
                     </div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Real-time</span>
                   </div>
-                  <p className="text-slate-500 text-sm font-bold">Insects</p>
-                  <h4 className="text-3xl font-black text-slate-900 mt-1 flex items-baseline">
+                  <p className="text-slate-500 text-xs sm:text-sm font-bold">Insects</p>
+                  <h4 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1 flex items-baseline">
                     {latestFruitfly?.fruitfly_count ?? '--'}<span className="text-slate-300 text-base ml-1">counts</span>
                   </h4>
                 </div>
 
-                <div className="group bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-red-500/5 transition-all">
+                <div className="group bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-red-500/5 transition-all min-h-[145px] sm:min-h-[180px]">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="p-4 bg-red-50 text-red-500 rounded-2xl group-hover:scale-110 transition-transform">
-                      <Thermometer size={32} />
+                    <div className="p-3 sm:p-4 bg-red-50 text-red-500 rounded-xl sm:rounded-2xl group-hover:scale-110 transition-transform">
+                      <Thermometer size={24} className="sm:w-8 sm:h-8" />
                     </div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Real-time</span>
                   </div>
-                  <p className="text-slate-500 text-sm font-bold">Temperature</p>
-                  <h4 className="text-3xl font-black text-slate-900 mt-1 flex items-baseline">
+                  <p className="text-slate-500 text-xs sm:text-sm font-bold">Temperature</p>
+                  <h4 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1 flex items-baseline">
                     {latestEnv?.temperature ?? '--'}<span className="text-slate-300 text-base ml-1">°C</span>
                   </h4>
                 </div>
 
-                <div className="group bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all">
+                <div className="group bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all min-h-[145px] sm:min-h-[180px] sm:col-span-2 xl:col-span-1">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="p-4 bg-blue-50 text-blue-500 rounded-2xl group-hover:scale-110 transition-transform">
-                      <Droplets size={32} />
+                    <div className="p-3 sm:p-4 bg-blue-50 text-blue-500 rounded-xl sm:rounded-2xl group-hover:scale-110 transition-transform">
+                      <Droplets size={24} className="sm:w-8 sm:h-8" />
                     </div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Real-time</span>
                   </div>
-                  <p className="text-slate-500 text-sm font-bold">Humidity</p>
-                  <h4 className="text-3xl font-black text-slate-900 mt-1 flex items-baseline">
+                  <p className="text-slate-500 text-xs sm:text-sm font-bold">Humidity</p>
+                  <h4 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1 flex items-baseline">
                     {latestEnv?.humidity ?? '--'}<span className="text-slate-300 text-base ml-1">%</span>
                   </h4>
                 </div>

@@ -13,6 +13,8 @@ import Profile from './pages/Profile';
 import GateWays from './pages/gateways';
 import AdminContent from './pages/AdminContent';
 import Footer from './components/Footer';
+import SystemTelemetry from './pages/SystemTelemetry';
+import FruitflyImages from './pages/FruitflyImages';
 
 function App() {
   return (
@@ -67,6 +69,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/system-telemetry"
+              element={
+                <ProtectedRoute>
+                  <SystemTelemetry />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/fruitfly-images"
+              element={
+                <ProtectedRoute>
+                  <FruitflyImages />
                 </ProtectedRoute>
               }
             />

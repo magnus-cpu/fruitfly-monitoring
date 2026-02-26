@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api/Sapi';
 import { useAuth } from '../contexts/useAuth';
+import BackButton from '../components/BackButton';
 
 interface ContentBlock {
   id: number;
@@ -99,6 +100,7 @@ const AdminContent: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 p-8">
         <div className="max-w-4xl mx-auto bg-white border border-slate-200 rounded-xl p-6">
+          <BackButton className="mb-4" />
           <h1 className="text-xl font-semibold text-slate-900">Admin Access Required</h1>
           <p className="text-slate-600 mt-2">You do not have permission to access this page.</p>
         </div>
@@ -110,6 +112,7 @@ const AdminContent: React.FC = () => {
     <div className="min-h-screen bg-slate-50 p-6 md:p-10">
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
+          <BackButton className="mb-3" />
           <h1 className="text-2xl font-bold text-slate-900">Content Manager</h1>
           <p className="text-slate-500 mt-1">Edit guidance text shown on dashboard, reports, sensors, and gateways.</p>
         </header>

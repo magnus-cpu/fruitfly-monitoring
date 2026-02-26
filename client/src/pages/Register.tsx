@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { EyeOff, Eye } from 'lucide-react';
+import axios from 'axios';
+
+type ApiErrorResponse = {
+  message?: string;
+  errors?: Array<{ msg?: string }>;
+};
 
 const Register: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -34,26 +40,30 @@ const Register: React.FC = () => {
       return;
     }
 
-try {
-  setLoading(true);
-  await register(username, email, password);
-  navigate('/login');
-} catch (error) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const err = error as { response?: { data?: { message?: string, errors?: Array<{msg: string}> } } };
-
-    if (err.response?.data?.errors && err.response.data.errors.length > 0) {
-      // Join all error messages
-      setError(err.response.data.errors.map(e => e.msg).join(', '));
-    } else {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+    try {
+      setLoading(true);
+      const message = await register(username, email, password);
+      navigate('/login', {
+        state: {
+          message: message || 'Registration successful. Please log in.'
+        }
+      });
+    } catch (error) {
+      if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        const fieldErrors = error.response?.data?.errors
+          ?.map((item) => item.msg)
+          .filter(Boolean);
+        if (fieldErrors && fieldErrors.length > 0) {
+          setError(fieldErrors.join(', '));
+        } else {
+          setError(error.response?.data?.message || 'Registration failed. Please try again.');
+        }
+      } else {
+        setError('Registration failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-  } else {
-    setError('Registration failed. Please try again.');
-  }
-} finally {
-  setLoading(false);
-}
 
   };
 

@@ -4,13 +4,17 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api/Sapi';
 import { useNavigate } from 'react-router-dom';
+import BackButton from '../components/BackButton';
 
 
 interface SensorData {
-    id: number;
-    temperature: number;
-    humidity: number;
-    created_at: string;
+    temperature?: number;
+    humidity?: number;
+    fruitfly_count?: number;
+    power?: number;
+    cpu_temp?: number;
+    created_at?: string;
+    time_taken?: string;
 }
 
 interface SensorProperties {
@@ -115,8 +119,21 @@ const MapView: React.FC = () => {
         return Promise.all(
             sensorList.map(async (sensor) => {
                 try {
-                    const response = await api.get(`/fruitfly/${sensor.serial_number}/combined_data`);
-                    const latest = response.data?.[response.data.length - 1] ?? null;
+                    const combinedResponse = await api.get(`/fruitfly/${sensor.serial_number}/combined_data`);
+                    const latestEnv = combinedResponse.data?.environmental?.[0] ?? null;
+                    const latestCount = combinedResponse.data?.fruitfly?.[0] ?? null;
+                    const latestTelemetry = combinedResponse.data?.telemetry?.[0] ?? null;
+                    const latest = latestEnv || latestCount
+                        ? {
+                            temperature: latestEnv?.temperature,
+                            humidity: latestEnv?.humidity,
+                            fruitfly_count: latestCount?.fruitfly_count,
+                            power: latestTelemetry?.power,
+                            cpu_temp: latestTelemetry?.cpu_temp,
+                            created_at: latestEnv?.created_at || latestCount?.created_at,
+                            time_taken: latestEnv?.time_taken || latestCount?.time_taken
+                        }
+                        : null;
                     return [sensor.serial_number, latest] as const;
                 } catch (error) {
                     console.error(`Failed to load data for sensor ${sensor.serial_number}`, error);
@@ -164,11 +181,20 @@ const MapView: React.FC = () => {
     }, [features]);
 
     return (
-        <div className="h-screen w-screen">
+        <div className="min-h-screen w-full bg-slate-100 px-2 sm:px-4 lg:px-6 py-6">
+            <div className="w-full">
+                <div className="mb-4">
+                    <BackButton />
+                </div>
+                <div className="mb-4">
+                    <h1 className="text-2xl font-bold text-slate-900">Network Map</h1>
+                    <p className="text-sm text-slate-500 mt-1">Sensor and gateway locations with live status links.</p>
+                </div>
+                <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-[78vh] min-h-[520px] lg:h-[calc(100vh-11rem)] z-0">
             <MapContainer
                 center={[-37.8136, 144.9631]}
                 zoom={6}
-                scrollWheelZoom
+                scrollWheelZoom={false}
                 className="h-full w-full"
             >
                 <TileLayer
@@ -192,6 +218,9 @@ const MapView: React.FC = () => {
                     const status = properties.activity_status ?? 'inactive';
                     const temp = latest?.temperature ?? properties.temp;
                     const hum = latest?.humidity ?? properties.humidity;
+                    const insects = latest?.fruitfly_count ?? properties.insects;
+                    const power = latest?.power;
+                    const cpuTemp = latest?.cpu_temp;
                     const icon = properties.entity === 'gateway'
                         ? gatewayIcon
                         : (status === 'active' ? activeIcon : inactiveIcon);
@@ -205,43 +234,60 @@ const MapView: React.FC = () => {
                             }}
                         >
                             <Popup>
-                                <div className="min-w-[180px]">
-                                    <b className="text-slate-800">{properties.name}</b>
+                                <div className="min-w-[230px] max-w-[270px] p-1 relative map-popup-card rounded-xl">
+                                    <div className="absolute -top-8 -right-8 w-20 h-20 bg-emerald-200/30 rounded-full blur-2xl animate-pulse" />
+                                    <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-blue-200/20 rounded-full blur-2xl animate-pulse" />
+                                    <div className="relative z-10">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <b className="text-slate-800">{properties.name}</b>
+                                        <span
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full ${status === 'active'
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-rose-100 text-rose-700'
+                                                }`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full ${status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                                            {status}
+                                        </span>
+                                    </div>
                                     <p className="text-xs text-slate-500 mt-1">{properties.location}</p>
                                     {properties.entity === 'gateway' ? (
                                         <div className="mt-2 space-y-2">
                                             <p className="text-xs text-slate-600">Gateway node</p>
+                                            <p className="text-xs text-slate-500">Gateway ID: {properties.id}</p>
                                             <button
                                                 onClick={() => navigate(`/gateways/${properties.id}/sensors`)}
-                                                className="text-xs font-semibold text-blue-600 hover:text-blue-500"
+                                                className="mt-1 inline-flex items-center justify-center w-full text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 px-2 py-1.5 rounded-md transition-colors"
                                             >
-                                                View data
+                                                View More Data
                                             </button>
                                         </div>
                                     ) : (
                                         <>
-                                            <p className="text-xs mt-2">
-                                                Status:{' '}
-                                                <span
-                                                    className={`font-semibold ${status === 'active' ? 'text-emerald-600' : 'text-rose-600'
-                                                        }`}
+                                            <div className="text-xs text-slate-600 mt-2 space-y-1.5">
+                                                <div><span className="font-semibold text-slate-700">Serial:</span> {properties.serial_number ?? 'N/A'}</div>
+                                                <div><span className="font-semibold text-slate-700">Gateway ID:</span> {properties.gateway_id ?? 'N/A'}</div>
+                                                <div><span className="font-semibold text-slate-700">Temperature:</span> {temp ?? 'N/A'}°C</div>
+                                                <div><span className="font-semibold text-slate-700">Humidity:</span> {hum ?? 'N/A'}%</div>
+                                                <div><span className="font-semibold text-slate-700">Insects:</span> {insects ?? 0}</div>
+                                                <div><span className="font-semibold text-slate-700">Power:</span> {power ?? 'N/A'}W</div>
+                                                <div><span className="font-semibold text-slate-700">CPU Temp:</span> {cpuTemp ?? 'N/A'}°C</div>
+                                                <div><span className="font-semibold text-slate-700">Coordinates:</span> {geometry.coordinates[1].toFixed(5)}, {geometry.coordinates[0].toFixed(5)}</div>
+                                                {(latest?.time_taken || latest?.created_at) ? (
+                                                    <div><span className="font-semibold text-slate-700">Updated:</span> {new Date(latest.time_taken ?? latest.created_at ?? '').toLocaleString()}</div>
+                                                ) : null}
+                                            </div>
+                                            {properties.gateway_id ? (
+                                                <button
+                                                    onClick={() => navigate(`/gateways/${properties.gateway_id}/sensors?sensorId=${properties.id}`)}
+                                                    className="mt-3 inline-flex items-center justify-center w-full text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 px-2 py-1.5 rounded-md transition-colors"
                                                 >
-                                                    {status}
-                                                </span>
-                                            </p>
-                                            {(temp !== undefined || hum !== undefined) && (
-                                                <div className="text-xs text-slate-600 mt-2">
-                                                    {temp !== undefined && <div>🌡️ {temp}°C</div>}
-                                                    {hum !== undefined && <div>💧 {hum}%</div>}
-                                                    {latest?.created_at && (
-                                                        <div>
-                                                            ⌛ {new Date(latest.created_at).toLocaleString()}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                                    View More Data
+                                                </button>
+                                            ) : null}
                                         </>
                                     )}
+                                    </div>
                                 </div>
                             </Popup>
                         </Marker>
@@ -270,6 +316,21 @@ const MapView: React.FC = () => {
                     );
                 })}
             </MapContainer>
+                </div>
+            </div>
+            <style>{`
+                @keyframes mapPopupShift {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+                .map-popup-card {
+                    background: linear-gradient(120deg, rgba(255,255,255,0.92), rgba(236,253,245,0.92), rgba(239,246,255,0.92), rgba(255,255,255,0.92));
+                    background-size: 220% 220%;
+                    animation: mapPopupShift 10s ease-in-out infinite;
+                    border: 1px solid rgba(167, 243, 208, 0.7);
+                }
+            `}</style>
         </div>
     );
 };

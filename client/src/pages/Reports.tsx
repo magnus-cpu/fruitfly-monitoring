@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/useAuth';
 import { Download, Calendar, FileText, TrendingUp } from 'lucide-react';
 import api from '../api/Sapi';
 import { PageInfo, type ContentBlock } from '../components/PageInfo';
+import BackButton from '../components/BackButton';
 
 interface Report {
   id: number;
@@ -134,7 +135,10 @@ const Reports: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Reports</h1>
+      <div className="mb-8">
+        <BackButton className="mb-3" />
+        <h1 className="text-3xl font-bold">Reports</h1>
+      </div>
 
       {/* Generate New Report */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">

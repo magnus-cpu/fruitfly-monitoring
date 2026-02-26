@@ -79,6 +79,7 @@ app.use(cors(corsOptions));
 // Body parsing middleware
 app.use(express.json({ limit: MAX_PAYLOAD_SIZE }));
 app.use(express.urlencoded({ extended: true, limit: MAX_PAYLOAD_SIZE }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploaded_images')));
 
 // Health check route
 app.get('/api/health', async (req, res) => {

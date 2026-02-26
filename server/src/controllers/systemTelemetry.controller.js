@@ -157,3 +157,65 @@ export const storeSystemTelemetry = async (req, res) => {
     });
   }
 };
+
+export const getSystemTelemetry = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { sensor_serial_number, gateway_serial_number } = req.query;
+    const parsedLimit = Number(req.query.limit);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+      ? Math.min(Math.trunc(parsedLimit), 200)
+      : 50;
+
+    const filters = ['COALESCE(s.user_id, g.user_id) = ?'];
+    const params = [userId];
+
+    if (sensor_serial_number) {
+      filters.push('s.serial_number = ?');
+      params.push(sensor_serial_number);
+    }
+
+    if (gateway_serial_number) {
+      filters.push('g.serial_number = ?');
+      params.push(gateway_serial_number);
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT
+        st.id,
+        st.gateway_id,
+        st.sensor_id,
+        g.name AS gateway_name,
+        g.serial_number AS gateway_serial_number,
+        s.name AS sensor_name,
+        s.serial_number AS sensor_serial_number,
+        st.voltage,
+        st.current,
+        st.power,
+        st.signal_strength,
+        st.cpu_temp,
+        st.time_taken,
+        st.created_at
+      FROM system_telemetry st
+      LEFT JOIN gateways g ON g.id = st.gateway_id
+      LEFT JOIN sensors s ON s.id = st.sensor_id
+      WHERE ${filters.join(' AND ')}
+      ORDER BY COALESCE(st.time_taken, st.created_at) DESC
+      LIMIT ${limit}`,
+      params
+    );
+
+    return res.json({
+      status: true,
+      count: rows.length,
+      rows
+    });
+  } catch (error) {
+    console.error('Error fetching system telemetry:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Failed to fetch system telemetry.',
+      error: error.message
+    });
+  }
+};

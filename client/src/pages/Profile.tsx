@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { FieldProps, ModalProps, ProfileProps } from '../types/profileTypes';
 import api from '../api/Sapi';
+import BackButton from '../components/BackButton';
 
 interface Sensor {
   id: number;
@@ -170,6 +171,7 @@ const Profile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-10 max-w-5xl">
+        <BackButton className="mb-4" />
         {/* ---- header ---- */}
         <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-2xl shadow-lg text-white p-8 flex items-center space-x-6">
           <div className="bg-white bg-opacity-20 p-4 rounded-full">

@@ -16,6 +16,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../api/Sapi';
 import { PageInfo, type ContentBlock } from '../components/PageInfo';
+import BackButton from '../components/BackButton';
 
 interface Gateway {
   id: number;
@@ -234,6 +235,7 @@ const GateWays = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
+            <BackButton className="mb-3" />
             <h1 className="text-2xl font-bold text-slate-900 tracking-widest">Devices Management</h1>
             <p className="text-slate-500  mt-1">Monitor and manage your IoT Gateways and Nodes</p>
           </div>

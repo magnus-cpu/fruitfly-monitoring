@@ -5,13 +5,14 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api/Sapi';
 import {
-  Thermometer, Droplets, Bug, MapPin,
-  LucideEye
+  Thermometer, Bug, MapPin, Activity, Image
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import DetailPanel from '../components/DetailPanel';
 import { PageInfo, type ContentBlock } from '../components/PageInfo';
+import BackButton from '../components/BackButton';
 
-interface SensorProperties {
+export interface SensorProperties {
   id: number;
   name: string;
   location: string;
@@ -23,7 +24,7 @@ interface SensorProperties {
   activity_status?: 'active' | 'inactive' | string;
 }
 
-interface GeoFeature {
+export interface GeoFeature {
   type: 'Feature';
   properties: SensorProperties;
   geometry: {
@@ -32,9 +33,24 @@ interface GeoFeature {
   };
 }
 
-interface GeoJSONData {
+export interface GeoJSONData {
   type: 'FeatureCollection';
   features: GeoFeature[];
+}
+
+interface TelemetryPreview {
+  sensor_name: string | null;
+  gateway_name: string | null;
+  power: number | null;
+  signal_strength: number | null;
+  created_at: string;
+}
+
+interface ImagePreview {
+  sensor_name: string;
+  analysis_status: string;
+  image_url: string;
+  created_at: string;
 }
 
 
@@ -59,25 +75,6 @@ const pointToLayer = (feature: GeoFeature, latlng: L.LatLng) => {
     icon: feature.properties.entity === 'gateway' ? gatewayIcon : sensorIcon
   });
 };
-
-// Component to fit map bounds to all markers on load
-// const FitBounds: React.FC<{ data: GeoJSONData }> = ({ data }) => {
-//   const map = useMap();
-//   const hasFit = React.useRef(false);
-
-//   useEffect(() => {
-//     if (!data || !data.features.length || hasFit.current) return;
-
-//     const bounds = L.latLngBounds(
-//       data.features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]])
-//     );
-
-//     map.fitBounds(bounds, { padding: [50, 50] });
-//     hasFit.current = true;
-//   }, [data, map]);
-
-//   return null;
-// };
 
 // Component to zoom to clicked marker
 const ZoomToMarker: React.FC<{ point: [number, number] | null }> = ({ point }) => {
@@ -109,6 +106,8 @@ const Dashboard: React.FC = () => {
   const [selectedFeature, setSelectedFeature] = useState<SensorProperties | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<[number, number] | null>(null);
   const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([]);
+  const [telemetryPreview, setTelemetryPreview] = useState<TelemetryPreview | null>(null);
+  const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
   const navigate = useNavigate();
 
   // Fetch GeoJSON locations from API
@@ -128,6 +127,16 @@ const Dashboard: React.FC = () => {
     api.get('/content', { params: { page: 'dashboard' } })
       .then((res) => setContentBlocks(res.data))
       .catch((err) => console.error('Failed to load dashboard info', err));
+  }, []);
+
+  useEffect(() => {
+    api.get('/device/system-telemetry', { params: { limit: 1 } })
+      .then((res) => setTelemetryPreview(res.data?.rows?.[0] ?? null))
+      .catch((err) => console.error('Failed to load telemetry preview', err));
+
+    api.get('/device/fruitfly-images', { params: { limit: 1 } })
+      .then((res) => setImagePreview(res.data?.rows?.[0] ?? null))
+      .catch((err) => console.error('Failed to load image preview', err));
   }, []);
 
   const onEachFeature = useCallback((feature: GeoFeature, layer: L.Layer) => {
@@ -188,43 +197,136 @@ const Dashboard: React.FC = () => {
     };
   }, [geoData]);
 
-  const handleNavigateData = async (id: number) => {
-    navigate(`/gateways/${id}/sensors`);
-
+  const handleNavigateData = (gatewayId: number, sensorId?: number) => {
+    const query = sensorId ? `?sensorId=${sensorId}` : '';
+    navigate(`/gateways/${gatewayId}/sensors${query}`);
   }
+
+  const handleClosePanel = () => {
+    setSelectedFeature(null);
+  };
 
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-200 font-sans selection:bg-blue-500/30">
-      <main className="max-w-7xl mx-auto px-6 pt-8 pb-32">
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-widest">Farm Overview</h1>
-          <p className="text-slate-500 mt-1">Monitoring multiple sectors with live sensor data.</p>
+    <div className="min-h-screen bg-gray-100 text-slate-800 font-sans selection:bg-blue-500/30">
+      <main className="max-w-full mx-auto px-0 sm:px-0 lg:px-0 pt-8 pb-32">
+        <header className="mb-8 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <BackButton className="mb-3" />
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Farm Overview</h1>
+            <p className="text-slate-500 mt-1">Real-time monitoring of your agricultural sectors.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => navigate('/system-telemetry')}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:border-indigo-500 hover:text-indigo-600"
+            >
+              <Activity size={15} />
+              System Telemetry
+            </button>
+            <button
+              onClick={() => navigate('/fruitfly-images')}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:border-indigo-500 hover:text-indigo-600"
+            >
+              <Image size={15} />
+              Fruitfly Images
+            </button>
+          </div>
         </header>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 overflow-hidden">
-            <h3 className="text-sm text-slate-800 font-semibold">Total Sensors</h3>
-            <p className="text-2xl text-slate-600 mt-1">{sensorStats.total}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 overflow-hidden">
-            <h3 className="text-sm text-slate-800 font-semibold">Active Sensors</h3>
-            <p className="text-2xl text-slate-600 mt-1">{sensorStats.active}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 overflow-hidden">
-            <h3 className="text-sm text-slate-800 font-semibold">Total Pests</h3>
-            <p className="text-2xl text-slate-600 mt-1">{sensorStats.pests}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 overflow-hidden">
-            <h3 className="text-sm text-slate-800 font-semibold">Gateways</h3>
-            <p className="text-2xl text-slate-600 mt-1">{sensorStats.gateways}</p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 px-4 sm:px-6 lg:px-8">
+          <button
+            type="button"
+            onClick={() => navigate('/gateways')}
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-6 text-left hover:border-indigo-400 hover:shadow-md transition-all"
+          >
+            <div className="bg-indigo-500/10 p-4 rounded-xl">
+              <Bug className="text-indigo-500" size={28} />
+            </div>
+            <div>
+              <h3 className="text-sm text-slate-500 font-medium">Total Sensors</h3>
+              <p className="text-3xl font-bold text-slate-900 mt-1">{sensorStats.total}</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/map')}
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-6 text-left hover:border-indigo-400 hover:shadow-md transition-all"
+          >
+            <div className="bg-emerald-500/10 p-4 rounded-xl">
+              <Thermometer className="text-emerald-500" size={28} />
+            </div>
+            <div>
+              <h3 className="text-sm text-slate-500 font-medium">Active Sensors</h3>
+              <p className="text-3xl font-bold text-slate-900 mt-1">{sensorStats.active}</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/fruitfly-images')}
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-6 text-left hover:border-indigo-400 hover:shadow-md transition-all"
+          >
+            <div className="bg-rose-500/10 p-4 rounded-xl">
+              <Bug className="text-rose-500" size={28} />
+            </div>
+            <div>
+              <h3 className="text-sm text-slate-500 font-medium">Total Pests</h3>
+              <p className="text-3xl font-bold text-slate-900 mt-1">{sensorStats.pests}</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/gateways')}
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-6 text-left hover:border-indigo-400 hover:shadow-md transition-all"
+          >
+            <div className="bg-sky-500/10 p-4 rounded-xl">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-sky-500"><path d="M2 12h2"/><path d="M6 6.1_1.83.33-1.82.33-1.83L6 17.9"/><path d="M11.63 15.5H18v-3l-2.04-2.04a2.5 2.5 0 0 0-3.54 0L11.63 11V7.5a4.5 4.5 0 1 0-9 0V11l1.52 1.52a2.5 2.5 0 0 0 3.54 0L8.37 12H18"/><path d="M22 12h-2"/></svg>
+            </div>
+            <div>
+              <h3 className="text-sm text-slate-500 font-medium">Gateways</h3>
+              <p className="text-3xl font-bold text-slate-900 mt-1">{sensorStats.gateways}</p>
+            </div>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 px-4 sm:px-6 lg:px-8">
+          <button
+            onClick={() => navigate('/system-telemetry')}
+            className="bg-white rounded-2xl border border-slate-200 p-5 text-left hover:border-indigo-400 transition-colors"
+          >
+            <div className="flex items-center gap-2 text-indigo-600 mb-2">
+              <Activity size={16} />
+              <span className="text-xs font-bold uppercase tracking-wider">Latest Telemetry</span>
+            </div>
+            <p className="text-sm font-semibold text-slate-900 truncate">
+              {telemetryPreview?.sensor_name ?? telemetryPreview?.gateway_name ?? 'No telemetry data yet'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Power: {telemetryPreview?.power ?? 'N/A'}W | Signal: {telemetryPreview?.signal_strength ?? 'N/A'}
+            </p>
+          </button>
+
+          <button
+            onClick={() => navigate('/fruitfly-images')}
+            className="bg-white rounded-2xl border border-slate-200 p-5 text-left hover:border-indigo-400 transition-colors"
+          >
+            <div className="flex items-center gap-2 text-indigo-600 mb-2">
+              <Image size={16} />
+              <span className="text-xs font-bold uppercase tracking-wider">Latest Image</span>
+            </div>
+            <p className="text-sm font-semibold text-slate-900 truncate">
+              {imagePreview?.sensor_name ?? 'No image data yet'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Status: {imagePreview?.analysis_status ?? 'N/A'}
+            </p>
+          </button>
         </div>
 
         {/* Map & Detail View */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:h-[580px] md:h-[140vh]">
-          <div className="lg:col-span-2 z-0 relative rounded-3xl overflow-hidden border border-slate-500/50 shadow-lg">
+        <div className="relative">
+          <div className="z-0 h-[55vh] min-h-[360px] lg:h-[600px]">
             <MapContainer
               center={[-6.7924, 39.2083]}
               zoom={6}
@@ -238,7 +340,6 @@ const Dashboard: React.FC = () => {
 
               {geoData && (
                 <>
-                  {/* <FitBounds data={geoData} /> */}
                   <ZoomToMarker point={selectedPoint} />
                   <GeoJSON
                     data={geoData}
@@ -253,123 +354,24 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Detail Panel */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-6">
-            {selectedFeature ? (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">{selectedFeature.name}</h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    {selectedFeature.entity === 'gateway' ? 'Gateway Node' : 'Sensor Node'}
-                  </p>
-                </div>
-
-                {selectedFeature.entity === 'gateway' ? (
-                  // Gateway Details
-                  <div className="space-y-4">
-                    <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-                      <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Location</p>
-                      <p className="text-lg font-bold text-slate-600">{selectedFeature.location}</p>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-                      <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Gateway ID</p>
-
-                      <div className='flex justify-between  py-1 px-4'>
-                        <p className="text-lg font-bold text-slate-600">{selectedFeature.id}</p>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleNavigateData(selectedFeature.id); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-indigo-600 bg-white hover:bg-indigo-50 rounded-md border border-slate-200 shadow-sm transition-all"
-                        >
-                          <LucideEye size={14} />
-                          <span className="text-xs font-medium whitespace-nowrap">View Data</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="bg-blue-500/10 border border-slate-500/50 p-4 rounded-2xl">
-                      <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Connected Sensors</p>
-                      <p className="text-2xl font-black text-blue-600">
-                        {geoData?.features.filter(
-                          f => f.properties.entity === 'sensor' && f.properties.gateway_id === selectedFeature.id
-                        ).length ?? 0}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  // Sensor Details
-                  <div className="space-y-4">
-                    {selectedFeature.activity_status && (
-                      <p className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-block ${selectedFeature.activity_status === 'active'
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-rose-500/20 text-rose-400'
-                        }`}>
-                        {selectedFeature.activity_status}
-                      </p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-                        <Thermometer className="text-orange-400 mb-2" size={30} />
-                        <p className="text-xs font-semibold tracking-widest text-slate-800">Temperature</p>
-                        <p className="text-xl font-bold text-slate-600">{selectedFeature.temp ?? 'N/A'}°C</p>
-                      </div>
-                      <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-                        <Droplets className="text-blue-400 mb-2" size={30} />
-                        <p className="text-xs font-semibold tracking-widest text-slate-800">Humidity</p>
-                        <p className="text-xl font-bold text-slate-600">{selectedFeature.humidity ?? 'N/A'}%</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-                      <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Location</p>
-                      <p className="text-lg font-bold text-slate-600">{selectedFeature.location}</p>
-                    </div>
-
-                    <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-                      <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Gateway ID</p>
-                      <div className='flex justify-between  py-1 px-4'>
-                        <p className="text-lg font-bold text-slate-600">{selectedFeature.gateway_id ?? 'N/A'}</p>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleNavigateData(Number(selectedFeature.gateway_id)); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-indigo-600 bg-white hover:bg-indigo-50 rounded-md border border-slate-200 shadow-sm transition-all"
-                        >
-                          <LucideEye size={14} />
-                          <span className="text-xs font-medium whitespace-nowrap">View Data</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="bg-indigo-500/10 border border-slate-500/50 p-4 rounded-2xl">
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2 text-rose-500">
-                          <Bug size={20} />
-                          <span className="font-bold">Insect Count</span>
-                        </div>
-                        <span className="text-xl font-black text-rose-500">{selectedFeature.insects ?? 0}</span>
-                      </div>
-                      <div className="w-full bg-slate-800/50 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-rose-400 transition-all duration-1000"
-                          style={{ width: `${Math.min((selectedFeature.insects ?? 0) * 2, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-[12px] text-slate-500 mt-2">Threshold: 50 per node</p>
-                    </div>
-                  </div>
-                )}
+          {selectedFeature ? (
+            <DetailPanel 
+              feature={selectedFeature} 
+              geoData={geoData} 
+              onClose={handleClosePanel}
+              onNavigate={handleNavigateData}
+            />
+          ) : (
+            <div className="relative mt-4 h-auto min-h-[180px] w-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-center text-slate-900 p-8 z-[1000] lg:absolute lg:top-0 lg:right-0 lg:mt-0 lg:h-full lg:w-1/3">
+              <div className="flex flex-col items-center">
+                <MapPin size={48} className="mb-4 text-slate-600" />
+                <p className="text-sm text-slate-600">Click on a map marker to view detailed node analytics</p>
               </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-900 p-8 opacity-40">
-                <MapPin size={48} className="mb-4" />
-                <p className="text-sm">Click on a map marker to view detailed node analytics</p>
-              </div>
-            )}
-            <button className="mt-auto w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-blue-600/20">
-              Download Sector Report
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="mt-10">
+        <div className="mt-10 px-4 sm:px-6 lg:px-8">
           <PageInfo title="Overview Guidance" blocks={contentBlocks} />
         </div>
       </main>

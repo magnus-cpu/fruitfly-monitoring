@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import pool from '../config/database.js';
 
 const OUTPUT_DIR = 'uploaded_images';
@@ -83,4 +83,58 @@ export const processImageData = async (req, res) => {
     }
 };
 
+export const getFruitflyImages = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { sensor_serial_number } = req.query;
+        const parsedLimit = Number(req.query.limit);
+        const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+            ? Math.min(Math.trunc(parsedLimit), 200)
+            : 50;
+
+        const params = [userId];
+        const conditions = ['s.user_id = ?'];
+
+        if (sensor_serial_number) {
+            conditions.push('s.serial_number = ?');
+            params.push(sensor_serial_number);
+        }
+
+        const [rows] = await pool.execute(
+            `SELECT
+                fi.id,
+                fi.sensor_id,
+                s.name AS sensor_name,
+                s.serial_number AS sensor_serial_number,
+                fi.image_path,
+                fi.analysis_status,
+                fi.time_captured,
+                fi.created_at
+            FROM fruitfly_images fi
+            INNER JOIN sensors s ON s.id = fi.sensor_id
+            WHERE ${conditions.join(' AND ')}
+            ORDER BY COALESCE(fi.time_captured, fi.created_at) DESC
+            LIMIT ${limit}`,
+            params
+        );
+
+        const rowsWithUrl = rows.map((row) => ({
+            ...row,
+            image_url: `${req.protocol}://${req.get('host')}/uploads/${basename(row.image_path)}`
+        }));
+
+        res.json({
+            status: true,
+            count: rowsWithUrl.length,
+            rows: rowsWithUrl
+        });
+    } catch (error) {
+        console.error('Error fetching fruitfly images:', error);
+        res.status(500).json({
+            status: false,
+            message: 'Failed to fetch fruitfly images',
+            error: error.message
+        });
+    }
+};
 

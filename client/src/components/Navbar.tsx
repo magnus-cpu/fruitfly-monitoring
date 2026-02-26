@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Map, BarChart3, FileText, LogOut, User, Menu, X } from 'lucide-react';
+import { Map, BarChart3, FileText, LogOut, User, Menu, X, Activity, ImageIcon, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 
 const Navbar: React.FC = () => {
@@ -8,7 +8,6 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-//  let id ='';
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -20,12 +19,12 @@ const Navbar: React.FC = () => {
   if (hideOnAuth) return null;
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: Map },
+    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/map', label: 'Map', icon: Map },
-    { path: '/gateways', label: 'GateWays', icon: BarChart3 },
-    // { path: `/gateways/${id}/sensors`, label: 'Sensors/Node', icon: BarChart3 },
+    { path: '/gateways', label: 'Gateways', icon: BarChart3 },
+    { path: '/system-telemetry', label: 'Telemetry', icon: Activity },
+    { path: '/fruitfly-images', label: 'Images', icon: ImageIcon },
     { path: '/reports', label: 'Reports', icon: FileText },
-
   ];
 
   const adminItems = user?.role === 'admin'
@@ -33,19 +32,19 @@ const Navbar: React.FC = () => {
     : [];
 
   return (
-    <nav className="bg-gradient-to-r from-[#6d3f27] via-[#3d2418] to-[#1a0f0a] text-white w-full shadow-lg sticky top-0 z-50">
-      <div className="container mx-auto px-4">
+    <nav className="bg-gradient-to-r from-green-900 via-emerald-800 to-lime-700 text-emerald-50 w-full shadow-lg sticky top-0 z-50 border-b border-green-500/40">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center space-x-2">
-            <div className="bg-white/15 text-white p-2 rounded-lg border border-white/20">
+          <Link to="/dashboard" className="flex items-center space-x-2.5">
+            <div className="bg-white/15 text-white p-2 rounded-lg border border-white/25">
               <Map className="w-6 h-6" />
             </div>
-            <span className="text-xl font-bold tracking-wide">FruitFly</span>
+            <span className="text-lg sm:text-xl font-bold tracking-wide text-white">FruitFly</span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden lg:flex items-center gap-2">
             {user && (
               <>
                 {[...navItems, ...adminItems].map((item) => {
@@ -54,9 +53,9 @@ const Navbar: React.FC = () => {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(item.path)
+                      className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(item.path)
                         ? 'bg-white/20 text-white'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        : 'text-emerald-50/90 hover:text-white hover:bg-white/10'
                         }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -69,16 +68,16 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* User Menu */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {user ? (
               <>
                 {/* Desktop User Menu */}
-                <div className="hidden md:flex items-center space-x-3">
+                <div className="hidden lg:flex items-center space-x-2">
                   <Link
                     to="/profile"
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/profile')
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive('/profile')
                       ? 'bg-white/20 text-white'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                      : 'text-emerald-50/90 hover:text-white hover:bg-white/10'
                       }`}
                   >
                     <User className="w-5 h-5" />
@@ -86,7 +85,7 @@ const Navbar: React.FC = () => {
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                    className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-emerald-50/90 hover:text-white hover:bg-white/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     <span>Logout</span>
@@ -96,7 +95,7 @@ const Navbar: React.FC = () => {
                 {/* Mobile Menu Button */}
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="md:hidden p-2 rounded-md text-white/80 hover:text-white hover:bg-white/10"
+                  className="lg:hidden p-2 rounded-md text-emerald-50/90 hover:text-white hover:bg-white/10"
                 >
                   {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                 </button>
@@ -107,14 +106,14 @@ const Navbar: React.FC = () => {
                   to="/login"
                   className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/login')
                     ? 'bg-white/20 text-white'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    : 'text-emerald-50/90 hover:text-white hover:bg-white/10'
                     }`}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className={`px-4 py-2 rounded-md text-sm font-medium bg-white text-emerald-800 hover:bg-emerald-50 ${isActive('/register') ? 'bg-emerald-50' : ''
+                  className={`px-4 py-2 rounded-md text-sm font-medium bg-amber-200 text-green-900 hover:bg-amber-100 ${isActive('/register') ? 'bg-amber-100' : ''
                     }`}
                 >
                   Register
@@ -126,7 +125,7 @@ const Navbar: React.FC = () => {
 
         {/* Mobile Menu */}
         {isMenuOpen && user && (
-          <div className="md:hidden py-4 border-t border-white/10">
+          <div className="lg:hidden py-4 border-t border-emerald-400/30">
             <div className="flex flex-col space-y-2">
               {[...navItems, ...adminItems].map((item) => {
                 const Icon = item.icon;
@@ -137,7 +136,7 @@ const Navbar: React.FC = () => {
                     onClick={() => setIsMenuOpen(false)}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(item.path)
                       ? 'bg-white/20 text-white'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                      : 'text-emerald-50/90 hover:text-white hover:bg-white/10'
                       }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -145,13 +144,13 @@ const Navbar: React.FC = () => {
                   </Link>
                 );
               })}
-              <div className="p-4 border-t border-white/10">
+              <div className="p-4 border-t border-emerald-400/30">
                 <Link
                   to="/profile"
                   onClick={() => setIsMenuOpen(false)}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/profile')
                     ? 'bg-white/20 text-white'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    : 'text-emerald-50/90 hover:text-white hover:bg-white/10'
                     }`}
                 >
                   <User className="w-5 h-5" />
@@ -159,7 +158,7 @@ const Navbar: React.FC = () => {
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center space-x-2 w-full px-3 py-2 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                  className="flex items-center space-x-2 w-full px-3 py-2 rounded-md text-sm font-medium text-emerald-50/90 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>

@@ -1,6 +1,33 @@
 import { ChevronRight } from "lucide-react";
 import type { Fruitfly } from "../types/sensorTypes";
 
+const DISPLAY_TZ_OFFSET_HOURS = 3;
+
+const parseDbTimestamp = (value: string) => {
+    const normalized = value.replace("T", " ").replace("Z", "").split(".")[0];
+    const [datePart = "", timePart = "00:00:00"] = normalized.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hour = 0, minute = 0] = timePart.split(":").map(Number);
+
+    if (!year || !month || !day) {
+        return { date: "-", time: "-" };
+    }
+
+    const utcMs = Date.UTC(year, month - 1, day, hour, minute);
+    const shifted = new Date(utcMs + DISPLAY_TZ_OFFSET_HOURS * 60 * 60 * 1000);
+
+    const yyyy = shifted.getUTCFullYear();
+    const mm = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(shifted.getUTCDate()).padStart(2, "0");
+    const hh = String(shifted.getUTCHours()).padStart(2, "0");
+    const min = String(shifted.getUTCMinutes()).padStart(2, "0");
+
+    return {
+        date: `${yyyy}-${mm}-${dd}`,
+        time: `${hh}:${min}`,
+    };
+};
+
 
 export const FruitflyTable = ({
     fruitflyData,
@@ -30,16 +57,17 @@ export const FruitflyTable = ({
                     const diff = prev
                         ? log.fruitfly_count - prev.fruitfly_count
                         : 0;
+                    const dbTime = parseDbTimestamp(log.time_taken);
 
                     return (
                         <tr key={log.id} className="hover:bg-slate-100/50 transition-colors group">
                             <td className="px-8 py-5 whitespace-nowrap">
                                 <div className="flex flex-col">
                                     <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-600 transition-colors">
-                                        {new Date(log.time_taken).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {dbTime.time}
                                     </span>
                                     <span className="text-[10px] font-medium text-slate-400">
-                                        {new Date(log.time_taken).toLocaleDateString()}
+                                        {dbTime.date}
                                     </span>
                                 </div>
                             </td>
