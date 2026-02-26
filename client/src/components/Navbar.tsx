@@ -40,7 +40,7 @@ const Navbar: React.FC = () => {
             <div className="bg-white/15 text-white p-2 rounded-lg border border-white/25">
               <Map className="w-6 h-6" />
             </div>
-            <span className="text-lg sm:text-xl font-bold tracking-wide text-white">FruitFly</span>
+            <span className="text-lg sm:text-xl font-bold tracking-wide text-white">iFF Trap</span>
           </Link>
 
           {/* Desktop Navigation */}
