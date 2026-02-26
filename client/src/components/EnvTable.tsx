@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { Environmental } from "../types/sensorTypes";
 
-const DISPLAY_TZ_OFFSET_HOURS = 1;
+const DISPLAY_TZ_OFFSET_HOURS = -3;
 
 const parseDbTimestamp = (value: string) => {
     const normalized = value.replace("T", " ").replace("Z", "").split(".")[0];
