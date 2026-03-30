@@ -41,10 +41,10 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ feature, geoData, onClose, on
               <p className="text-lg font-bold text-slate-600">{feature.location}</p>
             </div>
             <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-              <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Gateway ID</p>
+              <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Gateway Serial</p>
 
               <div className='flex justify-between  py-1 px-4'>
-                <p className="text-lg font-bold text-slate-600">{feature.id}</p>
+                <p className="text-lg font-bold text-slate-600">{feature.serial_number ?? 'N/A'}</p>
                 <button
                   onClick={(e) => { e.stopPropagation(); onNavigate(feature.id); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-indigo-600 bg-white hover:bg-indigo-50 rounded-md border border-slate-200 shadow-sm transition-all"
@@ -94,9 +94,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ feature, geoData, onClose, on
             </div>
 
             <div className="bg-slate-50 rounded-lg p-5 border border-slate-400/50">
-              <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Gateway ID</p>
+              <p className="text-xs font-semibold tracking-widest text-slate-800 mb-2">Gateway Serial</p>
               <div className='flex justify-between  py-1 px-4'>
-                <p className="text-lg font-bold text-slate-600">{feature.gateway_id ?? 'N/A'}</p>
+                <p className="text-lg font-bold text-slate-600">{feature.gateway_serial_number ?? 'N/A'}</p>
                 {sensorGatewayId !== null ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); onNavigate(sensorGatewayId, feature.id); }}

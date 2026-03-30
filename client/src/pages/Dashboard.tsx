@@ -17,7 +17,9 @@ export interface SensorProperties {
   name: string;
   location: string;
   entity: 'sensor' | 'gateway';
+  serial_number?: string;
   gateway_id?: number;
+  gateway_serial_number?: string;
   temp?: number;
   humidity?: number;
   insects?: number;
@@ -174,7 +176,7 @@ const Dashboard: React.FC = () => {
         <b class="text-slate-800">${properties.name}</b>
         <div class="text-xs text-slate-600 mt-2">
           📍 ${properties.location}<br/>
-          🔗 Gateway ID: ${properties.gateway_id ?? 'N/A'}
+          🔗 Gateway Serial: ${properties.gateway_serial_number ?? 'N/A'}
         </div>
       </div>
     `);

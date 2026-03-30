@@ -21,6 +21,7 @@ const buildLocationResponse = (rows) => {
         properties: {
           id: row.gateway_id,
           name: row.gateway_name,
+          serial_number: row.gateway_serial_number,
           location: row.gateway_location,
           entity: 'gateway'
         }
@@ -37,16 +38,17 @@ const buildLocationResponse = (rows) => {
             Number(row.sensor_lat)
           ]
         },
-        properties: {
-          id: row.sensor_id,
-          name: row.sensor_name,
-          serial_number: row.serial_number,
-          location: row.sensor_location,
-          entity: 'sensor',
-          gateway_id: row.gateway_id,
-          temp: row.temperature,
-          humidity: row.humidity,
-          insects: row.fruitfly_count,
+          properties: {
+            id: row.sensor_id,
+            name: row.sensor_name,
+            serial_number: row.serial_number,
+            location: row.sensor_location,
+            entity: 'sensor',
+            gateway_id: row.gateway_id,
+            gateway_serial_number: row.gateway_serial_number,
+            temp: row.temperature,
+            humidity: row.humidity,
+            insects: row.fruitfly_count,
           activity_status: row.sensor_status
         }
       });
@@ -71,6 +73,7 @@ export const getLocations = async (req, res) => {
       SELECT
           g.id AS gateway_id,
           g.name AS gateway_name,
+          g.serial_number AS gateway_serial_number,
           g.location AS gateway_location,
           g.location_lat AS gateway_lat,
           g.location_lng AS gateway_lng,
@@ -108,6 +111,7 @@ export const getPublicLandingLocations = async (req, res) => {
       SELECT
           g.id AS gateway_id,
           g.name AS gateway_name,
+          g.serial_number AS gateway_serial_number,
           g.location AS gateway_location,
           g.location_lat AS gateway_lat,
           g.location_lng AS gateway_lng,

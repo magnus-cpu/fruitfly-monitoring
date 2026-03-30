@@ -25,6 +25,7 @@ interface SensorProperties {
     location: string;
     entity: 'sensor' | 'gateway';
     gateway_id?: number;
+    gateway_serial_number?: string;
     temp?: number;
     humidity?: number;
     insects?: number;
@@ -256,7 +257,7 @@ const MapView: React.FC = () => {
                                     {properties.entity === 'gateway' ? (
                                         <div className="mt-2 space-y-2">
                                             <p className="text-xs text-slate-600">Gateway node</p>
-                                            <p className="text-xs text-slate-500">Gateway ID: {properties.id}</p>
+                                            <p className="text-xs text-slate-500">Gateway Serial: {properties.serial_number ?? 'N/A'}</p>
                                             <button
                                                 onClick={() => navigate(`/gateways/${properties.id}/sensors`)}
                                                 className="mt-1 inline-flex items-center justify-center w-full text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 px-2 py-1.5 rounded-md transition-colors"
@@ -268,7 +269,7 @@ const MapView: React.FC = () => {
                                         <>
                                             <div className="text-xs text-slate-600 mt-2 space-y-1.5">
                                                 <div><span className="font-semibold text-slate-700">Serial:</span> {properties.serial_number ?? 'N/A'}</div>
-                                                <div><span className="font-semibold text-slate-700">Gateway ID:</span> {properties.gateway_id ?? 'N/A'}</div>
+                                                <div><span className="font-semibold text-slate-700">Gateway Serial:</span> {properties.gateway_serial_number ?? 'N/A'}</div>
                                                 <div><span className="font-semibold text-slate-700">Temperature:</span> {temp ?? 'N/A'}°C</div>
                                                 <div><span className="font-semibold text-slate-700">Humidity:</span> {hum ?? 'N/A'}%</div>
                                                 <div><span className="font-semibold text-slate-700">Insects:</span> {insects ?? 0}</div>
