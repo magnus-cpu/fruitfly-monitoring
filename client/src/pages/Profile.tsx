@@ -105,7 +105,7 @@ const Modal: React.FC<ModalProps> = ({
   open ? (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
       <div className="relative w-full max-w-lg overflow-hidden rounded-[28px] border border-white/60 bg-white shadow-2xl">
-        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 px-6 py-5 text-white">
+        <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.16),_transparent_26%),linear-gradient(135deg,#10231c_0%,#173227_55%,#0f1e18_100%)] px-6 py-5 text-white">
           <button
             onClick={() => setOpen(false)}
             className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 p-2 text-white/80 transition hover:bg-white/20 hover:text-white"
@@ -362,11 +362,11 @@ const Profile: React.FC = () => {
           <BackButton />
         </div>
 
-        <section className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
-          <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_top,_rgba(129,140,248,0.28),_transparent_52%)] lg:block" />
+        <section className="relative overflow-hidden rounded-[32px] border border-emerald-950/20 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.18),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.16),_transparent_26%),linear-gradient(135deg,#10231c_0%,#173227_55%,#0f1e18_100%)] px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
+          <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.22),_transparent_52%)] lg:block" />
           <div className="relative grid gap-8 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-200">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {formatRole(profile.role)} workspace
               </div>
@@ -378,16 +378,16 @@ const Profile: React.FC = () => {
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                     {profile.username}
                   </h1>
-                  <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-50/80 sm:text-base">
                     Manage your identity, security settings, team access, and the devices assigned to this monitoring workspace.
                   </p>
-                  <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-200">
+                  <div className="mt-5 flex flex-wrap gap-3 text-sm text-emerald-100/85">
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
-                      <Mail className="h-4 w-4 text-indigo-300" />
+                      <Mail className="h-4 w-4 text-emerald-300" />
                       {profile.email}
                     </span>
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
-                      <Calendar className="h-4 w-4 text-cyan-300" />
+                      <Calendar className="h-4 w-4 text-amber-300" />
                       Joined {formatLocalDate(profile.created_at)}
                     </span>
                   </div>

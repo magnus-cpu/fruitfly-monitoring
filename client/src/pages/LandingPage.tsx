@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -204,9 +204,11 @@ const LandingMap: React.FC<{ features: LandingFeature[]; loading: boolean }> = (
           center={defaultCenter}
           zoom={6}
           scrollWheelZoom={false}
+          zoomControl={false}
           className="h-full w-full"
           attributionControl={false}
         >
+          <ZoomControl position="topright" />
           <TileLayer
             referrerPolicy="strict-origin-when-cross-origin"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

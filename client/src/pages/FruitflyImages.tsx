@@ -216,7 +216,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           />
         </div>
 
-        <aside className="border-t border-white/10 bg-slate-950/90 p-6 text-white lg:border-l lg:border-t-0 lg:p-8">
+        <aside className="border-t border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.16),_transparent_26%),linear-gradient(135deg,#10231c_0%,#173227_55%,#0f1e18_100%)] p-6 text-white lg:border-l lg:border-t-0 lg:p-8">
           <div className="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90">
             <span className={`rounded-full px-2.5 py-1 ${statusClassMap[image.analysis_status]}`}>
               {image.analysis_status}
@@ -228,19 +228,19 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
           <div className="mt-6 grid gap-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Captured</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-100/70">Captured</p>
               <p className="mt-2 text-sm font-medium text-white">
                 {formatLocalDateTime(image.time_captured ?? image.created_at)}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Recorded count</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-100/70">Recorded count</p>
               <p className="mt-2 text-sm font-medium text-white">
                 {image.fruitfly_count ?? 'Not linked'}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Analysis notes</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-100/70">Analysis notes</p>
               <p className="mt-2 text-sm leading-6 text-slate-200">
                 {image.analysis_notes?.trim() || 'No analysis notes recorded yet.'}
               </p>
@@ -470,33 +470,33 @@ const FruitflyImages: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
+        <section className="overflow-hidden rounded-[32px] border border-emerald-950/20 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.18),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.16),_transparent_26%),linear-gradient(135deg,#10231c_0%,#173227_55%,#0f1e18_100%)] px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <BackButton className="mb-4 border-white/15 bg-white/10 text-white hover:border-white/20 hover:bg-white/15 hover:text-white" />
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-200">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
                 <Camera className="h-3.5 w-3.5" />
                 Image review
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
                 Fruitfly image analysis
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/80 sm:text-base">
                 Review captures, analyze pending images, remove unwanted files, and open each image in a cleaner full-screen viewer.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <div className="rounded-3xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Images</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-emerald-100/75">Images</p>
                 <p className="mt-2 text-3xl font-semibold">{totals.total}</p>
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Pending</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-emerald-100/75">Pending</p>
                 <p className="mt-2 text-3xl font-semibold text-amber-300">{totals.pending}</p>
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Analyzed</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-emerald-100/75">Analyzed</p>
                 <p className="mt-2 text-3xl font-semibold text-emerald-300">{totals.analyzed}</p>
               </div>
             </div>

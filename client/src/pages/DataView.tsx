@@ -57,31 +57,31 @@ const DataView: React.FC = () => {
           <BackButton />
         </div>
 
-        <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
+        <section className="overflow-hidden rounded-[32px] border border-emerald-950/20 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.18),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.16),_transparent_26%),linear-gradient(135deg,#10231c_0%,#173227_55%,#0f1e18_100%)] px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
           <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-end">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-200">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
                 <Database className="h-3.5 w-3.5" />
                 Sensors access
               </div>
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                 Open the existing sensors view directly
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/80 sm:text-base">
                 This page gives you direct access to monitoring records from the navbar without first opening the dashboard or gateway cards.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Gateways</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-100/75">Gateways</p>
                 <p className="mt-3 text-3xl font-semibold">{gateways.length}</p>
-                <p className="mt-1 text-xs text-slate-300">Available data sources</p>
+                <p className="mt-1 text-xs text-emerald-50/75">Available data sources</p>
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Online</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-100/75">Online</p>
                 <p className="mt-3 text-3xl font-semibold">{onlineCount}</p>
-                <p className="mt-1 text-xs text-slate-300">Ready for monitoring</p>
+                <p className="mt-1 text-xs text-emerald-50/75">Ready for monitoring</p>
               </div>
             </div>
           </div>

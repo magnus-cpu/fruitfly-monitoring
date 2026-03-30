@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+@layer base {
+  .leaflet-container,
+  .leaflet-pane,
+  .leaflet-top,
+  .leaflet-bottom,
+  .leaflet-control,
+  .leaflet-tooltip,
+  .leaflet-popup {
+    z-index: 0;
+  }
+
+  .leaflet-overlay-pane,
+  .leaflet-marker-pane,
+  .leaflet-popup-pane,
+  .leaflet-control-container {
+    z-index: 10;
+  }
+}

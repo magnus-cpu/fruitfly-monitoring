@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api/Sapi';
@@ -197,8 +197,10 @@ const MapView: React.FC = () => {
                 center={[-37.8136, 144.9631]}
                 zoom={6}
                 scrollWheelZoom={false}
+                zoomControl={false}
                 className="h-full w-full"
             >
+                <ZoomControl position="topright" />
                 <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; OpenStreetMap contributors'
