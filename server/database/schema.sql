@@ -1,6 +1,6 @@
 -- Database creation and selection
-CREATE DATABASE IF NOT EXISTS fruitfly_monitoring_db;
-USE fruitfly_monitoring_db;
+CREATE DATABASE IF NOT EXISTS trapiqco_fruit_fly_db;
+USE trapiqco_fruit_fly_db;
 
 -- 1. USERS Table
 -- Stores user information, including authentication details.

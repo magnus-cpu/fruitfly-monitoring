@@ -15,7 +15,7 @@ const Navbar: React.FC = () => {
   };
 
   const isActive = (path: string) => location.pathname === path;
-  const hideOnAuth = location.pathname === '/login' || location.pathname === '/register';
+  const hideOnAuth = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/';
   if (hideOnAuth) return null;
 
   const navItems = [

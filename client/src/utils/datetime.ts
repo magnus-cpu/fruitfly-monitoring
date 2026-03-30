@@ -16,13 +16,12 @@ export const parseAppDate = (
   let normalized = trimmed;
 
   if (DATE_ONLY_PATTERN.test(trimmed)) {
-    normalized = `${trimmed}T00:00:00Z`;
+    normalized = `${trimmed}T00:00:00`;
   } else if (!HAS_TIMEZONE_PATTERN.test(trimmed)) {
     normalized = trimmed.replace(' ', 'T');
     if (!normalized.includes('T')) {
       normalized = `${normalized}T00:00:00`;
     }
-    normalized = `${normalized}Z`;
   }
 
   const parsed = new Date(normalized);
@@ -53,7 +52,12 @@ export const formatLocalTime = (
   }
 ): string => {
   const parsed = parseAppDate(value);
-  return parsed ? parsed.toLocaleTimeString(undefined, options) : '-';
+  return parsed
+    ? parsed.toLocaleTimeString(undefined, {
+        ...options,
+        hour12: false,
+      })
+    : '-';
 };
 
 export const formatLocalDateTime = (
@@ -67,5 +71,10 @@ export const formatLocalDateTime = (
   }
 ): string => {
   const parsed = parseAppDate(value);
-  return parsed ? parsed.toLocaleString(undefined, options) : '-';
+  return parsed
+    ? parsed.toLocaleString(undefined, {
+        ...options,
+        hour12: false,
+      })
+    : '-';
 };

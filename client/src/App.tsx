@@ -17,6 +17,7 @@ import Footer from './components/Footer';
 import SystemTelemetry from './pages/SystemTelemetry';
 import FruitflyImages from './pages/FruitflyImages';
 import DataView from './pages/DataView';
+import LandingPage from './pages/LandingPage';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/" element={<LandingPage />} />
             <Route
               path="/dashboard"
               element={
@@ -115,7 +117,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           <Footer />
       </Router>
