@@ -12,6 +12,7 @@ import environmentalData from './routes/environmentalData.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import userRoutes from './routes/user.routes.js';
 import contentRoutes from './routes/content.routes.js';
+import auditRoutes from './routes/audit.routes.js';
 import { initDB } from './config/database.js';
 import imageData from './routes/imageData.routes.js';
 import countsData from './routes/countsData.routes.js';
@@ -37,6 +38,9 @@ const __dirname = path.dirname(__filename);
 // Security middleware
 app.use(
   helmet({
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin'
+    },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -116,6 +120,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', dashboardData);
 app.use('/api/content', contentRoutes);
+app.use('/api/audit-logs', auditRoutes);
 
 // Serve frontend build (Vite)
 const clientDistPath = path.join(__dirname, '../../client/dist');

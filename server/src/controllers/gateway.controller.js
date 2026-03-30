@@ -1,5 +1,7 @@
 import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
+import { getOwnerUserId } from '../services/access.service.js';
+import { logAuditEvent } from '../services/audit.service.js';
 
 // Helper function to generate gateway serial number
 const generateGatewaySerial = async () => {
@@ -47,8 +49,23 @@ export const createGateWay = async (req, res) => {
 
         const [result] = await pool.execute(
             'INSERT INTO gateways (name, serial_number, description, location, location_lat, location_lng, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [name, serial_number, description, location, location_lat, location_lng, req.user.id]
+            [name, serial_number, description, location, location_lat, location_lng, getOwnerUserId(req.user)]
         );
+
+        await logAuditEvent(pool, {
+            actorUserId: req.user.id,
+            action: 'gateway.create',
+            entityType: 'gateway',
+            entityId: result.insertId,
+            details: {
+                ip_address: req.ip,
+                user_agent: req.get('user-agent') ?? null,
+                owner_user_id: getOwnerUserId(req.user),
+                name,
+                serial_number,
+                location
+            }
+        });
 
         res.status(201).json({
             status: true,
@@ -62,7 +79,7 @@ export const createGateWay = async (req, res) => {
                 location,
                 location_lat,
                 location_lng,
-                status: 'active',
+                status: 'online',
                 created_at: new Date()
             }
         });
@@ -91,12 +108,26 @@ export const updateGateway = async (req, res) => {
 
         const [result] = await pool.execute(
             'UPDATE gateways SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ? WHERE id = ? AND user_id = ?',
-            [name, description, location, location_lat, location_lng, req.params.id, req.user.id]
+            [name, description, location, location_lat, location_lng, req.params.id, getOwnerUserId(req.user)]
         );
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Gateway not found' });
         }
+
+        await logAuditEvent(pool, {
+            actorUserId: req.user.id,
+            action: 'gateway.update',
+            entityType: 'gateway',
+            entityId: req.params.id,
+            details: {
+                ip_address: req.ip,
+                user_agent: req.get('user-agent') ?? null,
+                owner_user_id: getOwnerUserId(req.user),
+                name,
+                location
+            }
+        });
 
         res.json({ message: 'Gateway updated successfully' });
     } catch (error) {
@@ -121,12 +152,24 @@ export const deleteGateway = async (req, res) => {
 
         const [result] = await pool.execute(
             'DELETE FROM gateways WHERE id = ? AND user_id = ?',
-            [req.params.id, req.user.id]
+            [req.params.id, getOwnerUserId(req.user)]
         );
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Gateway not found' });
         }
+
+        await logAuditEvent(pool, {
+            actorUserId: req.user.id,
+            action: 'gateway.delete',
+            entityType: 'gateway',
+            entityId: req.params.id,
+            details: {
+                ip_address: req.ip,
+                user_agent: req.get('user-agent') ?? null,
+                owner_user_id: getOwnerUserId(req.user)
+            }
+        });
 
         res.json({ message: 'Gateway deleted successfully' });
     } catch (error) {
@@ -143,7 +186,7 @@ export const getGateways = async (req, res) => {
     try {
         const [gateways] = await pool.execute(
             'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE user_id = ? ORDER BY created_at DESC',
-            [req.user.id]
+            [getOwnerUserId(req.user)]
         );
 
         res.json(gateways);
@@ -172,7 +215,7 @@ export const getGatewayById = async (req, res) => {
     try {
         const [gateways] = await pool.execute(
             'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM gateways WHERE id = ? AND user_id = ?',
-            [req.params.id, req.user.id]
+            [req.params.id, getOwnerUserId(req.user)]
         );
 
         if (gateways.length === 0) {
@@ -194,7 +237,7 @@ export const getGatewaysData = async (req, res) => {
               location_lat, location_lng, status, created_at
        FROM gateways
        WHERE id = ? AND user_id = ?`,
-            [req.params.id, req.user.id]
+            [req.params.id, getOwnerUserId(req.user)]
         );
 
         if (gateways.length === 0) {
@@ -207,7 +250,7 @@ export const getGatewaysData = async (req, res) => {
               location_lat, location_lng, status, created_at
        FROM sensors
        WHERE gateway_id = ? AND user_id = ?`,
-            [req.params.id, req.user.id]
+            [req.params.id, getOwnerUserId(req.user)]
         );
 
         // 3️⃣ Combine data properly

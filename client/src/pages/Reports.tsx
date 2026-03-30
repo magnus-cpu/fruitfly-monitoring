@@ -4,6 +4,7 @@ import { Download, Calendar, FileText, TrendingUp } from 'lucide-react';
 import api from '../api/Sapi';
 import { PageInfo, type ContentBlock } from '../components/PageInfo';
 import BackButton from '../components/BackButton';
+import { formatLocalDate, formatLocalDateTime } from '../utils/datetime';
 
 interface Report {
   id: number;
@@ -15,7 +16,7 @@ interface Report {
 }
 
 const Reports: React.FC = () => {
-  useAuth();
+  const { user } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -62,6 +63,11 @@ const Reports: React.FC = () => {
 
   const generateReport = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (user?.role === 'viewer') {
+      alert('Viewer accounts can only read and download reports.');
+      return;
+    }
 
     if (!startDate || !endDate) {
       alert('Please select both start and end dates');
@@ -146,6 +152,11 @@ const Reports: React.FC = () => {
           <FileText className="mr-2" />
           Generate New Report
         </h2>
+        {user?.role === 'viewer' && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Viewer accounts have read-only access. A manager must generate new reports.
+          </div>
+        )}
         <form onSubmit={generateReport} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -192,9 +203,9 @@ const Reports: React.FC = () => {
             <div className="mt-1 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
               <div className="font-semibold">Available data</div>
               <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-white px-2 py-0.5 font-semibold text-blue-800">
-                {new Date(availability.min).toLocaleDateString()}
+                {formatLocalDate(availability.min)}
                 <span className="text-blue-400">→</span>
-                {new Date(availability.max).toLocaleDateString()}
+                {formatLocalDate(availability.max)}
               </div>
             </div>
           ) : (
@@ -204,7 +215,7 @@ const Reports: React.FC = () => {
           )}
           <button
             type="submit"
-            disabled={generating}
+            disabled={generating || user?.role === 'viewer'}
             className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {generating ? (
@@ -251,12 +262,12 @@ const Reports: React.FC = () => {
                         <span className="font-medium">Range</span>
                       </div>
                       <div className="ml-5">
-                        {new Date(report.date_range_start).toLocaleDateString()} -{' '}
-                        {new Date(report.date_range_end).toLocaleDateString()}
+                        {formatLocalDate(report.date_range_start)} -{' '}
+                        {formatLocalDate(report.date_range_end)}
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                      Generated on {new Date(report.created_at).toLocaleString()}
+                      Generated on {formatLocalDateTime(report.created_at)}
                     </p>
                   </div>
                 </div>

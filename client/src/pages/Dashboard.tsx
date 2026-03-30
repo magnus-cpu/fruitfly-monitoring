@@ -336,6 +336,7 @@ const Dashboard: React.FC = () => {
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap contributors'
+                referrerPolicy="strict-origin-when-cross-origin"
               />
 
               {geoData && (

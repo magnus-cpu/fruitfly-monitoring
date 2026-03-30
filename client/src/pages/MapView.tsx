@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import api from '../api/Sapi';
 import { useNavigate } from 'react-router-dom';
 import BackButton from '../components/BackButton';
+import { formatLocalDateTime } from '../utils/datetime';
 
 
 interface SensorData {
@@ -201,6 +202,7 @@ const MapView: React.FC = () => {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; OpenStreetMap contributors'
                     maxZoom={22}
+                    referrerPolicy="strict-origin-when-cross-origin"
                 />
 
                 {features.length > 0 && (
@@ -274,7 +276,7 @@ const MapView: React.FC = () => {
                                                 <div><span className="font-semibold text-slate-700">CPU Temp:</span> {cpuTemp ?? 'N/A'}°C</div>
                                                 <div><span className="font-semibold text-slate-700">Coordinates:</span> {geometry.coordinates[1].toFixed(5)}, {geometry.coordinates[0].toFixed(5)}</div>
                                                 {(latest?.time_taken || latest?.created_at) ? (
-                                                    <div><span className="font-semibold text-slate-700">Updated:</span> {new Date(latest.time_taken ?? latest.created_at ?? '').toLocaleString()}</div>
+                                                    <div><span className="font-semibold text-slate-700">Updated:</span> {formatLocalDateTime(latest.time_taken ?? latest.created_at)}</div>
                                                 ) : null}
                                             </div>
                                             {properties.gateway_id ? (

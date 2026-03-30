@@ -1,6 +1,31 @@
 import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { jsPDF } from 'jspdf';
+import fs from 'fs';
+import path from 'path';
+import { getOwnerUserId } from '../services/access.service.js';
+import { logAuditEvent } from '../services/audit.service.js';
+
+const ensureDirectory = (targetPath) => {
+  fs.mkdirSync(targetPath, { recursive: true });
+};
+
+const getAbsoluteReportPath = (filePath) => path.resolve(process.cwd(), filePath);
+
+const getSnapshotPath = (filePath) => filePath.replace(/\.pdf$/i, '.json');
+
+const formatDateShort = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? '');
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatNumber2 = (value) => {
+  if (value === null || value === undefined || value === '') return 'N/A';
+  const num = Number(value);
+  if (Number.isNaN(num)) return String(value);
+  return num.toFixed(2);
+};
 
 const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
   const params = [userId];
@@ -109,6 +134,283 @@ const buildReportData = async ({ userId, reportType, dateStart, dateEnd }) => {
   return { summary };
 };
 
+const buildCsv = (reportData) => {
+  const summaryLines = Object.entries(reportData.summary ?? {}).map(
+    ([key, value]) => `${key},${value ?? ''}`
+  );
+
+  let sensorLines = [];
+  if (reportData.sensors && reportData.sensors.length) {
+    const headers = [
+      'sensor_id',
+      'name',
+      'location',
+      'status',
+      'gateway_id',
+      'readings',
+      'avg_temp',
+      'min_temp',
+      'max_temp',
+      'avg_humidity',
+      'min_humidity',
+      'max_humidity',
+      'fruitfly_samples',
+      'fruitfly_total',
+      'fruitfly_avg',
+      'fruitfly_max'
+    ];
+
+    sensorLines = [
+      headers.join(','),
+      ...reportData.sensors.map((row) =>
+        headers.map((header) => {
+          const value = row[header];
+          if (value === null || value === undefined) return '';
+          const safe = String(value).replace(/"/g, '""');
+          return safe.includes(',') ? `"${safe}"` : safe;
+        }).join(',')
+      )
+    ];
+  }
+
+  return [
+    'summary',
+    ...summaryLines,
+    '',
+    'sensors',
+    ...sensorLines
+  ].join('\n');
+};
+
+const buildPdfBuffer = ({ report, reportData }) => {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const lineHeight = 14;
+  let y = margin;
+
+  const addPageIfNeeded = (extra = lineHeight) => {
+    if (y + extra > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  const drawSectionTitle = (title) => {
+    addPageIfNeeded(24);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, margin, y);
+    y += 8;
+    doc.setDrawColor(180);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 12;
+    doc.setFont('helvetica', 'normal');
+  };
+
+  const drawSummaryRow = (label, value, labelWidth, valueWidth, rowHeight, isHeader = false, isStriped = false) => {
+    addPageIfNeeded(rowHeight + 8);
+    if (isHeader) {
+      doc.setFillColor(245, 247, 250);
+      doc.rect(margin, y, labelWidth, rowHeight, 'F');
+      doc.rect(margin + labelWidth, y, valueWidth, rowHeight, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin + 6, y + 14);
+      doc.text(value, margin + labelWidth + 6, y + 14);
+    } else {
+      doc.setFillColor(isStriped ? 250 : 255, isStriped ? 252 : 255, isStriped ? 255 : 255);
+      doc.rect(margin, y, labelWidth, rowHeight, 'F');
+      doc.rect(margin + labelWidth, y, valueWidth, rowHeight, 'F');
+      doc.setDrawColor(220);
+      doc.rect(margin, y, labelWidth, rowHeight);
+      doc.rect(margin + labelWidth, y, valueWidth, rowHeight);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin + 6, y + 14);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(value), margin + labelWidth + 6, y + 14);
+    }
+    y += rowHeight;
+  };
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('FruitFly Farm Report', margin, y);
+  y += 22;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Report ID: ${report.id ?? 'Pending'}`, margin, y);
+  y += lineHeight;
+  doc.text(`Type: ${report.report_type}`, margin, y);
+  y += lineHeight;
+  doc.setFillColor(238, 242, 255);
+  doc.setDrawColor(199, 210, 254);
+  doc.roundedRect(margin, y - 6, 260, 32, 6, 6, 'FD');
+  doc.setTextColor(30, 64, 175);
+  doc.text('Range', margin + 8, y + 6);
+  doc.text(
+    `${formatDateShort(report.date_range_start)} -> ${formatDateShort(report.date_range_end)}`,
+    margin + 8,
+    y + 18
+  );
+  doc.setTextColor(0, 0, 0);
+  y += lineHeight * 5.6;
+
+  drawSectionTitle('Summary');
+  const summary = reportData.summary ?? {};
+  const summaryEntries = Object.entries(summary);
+  const summaryRowHeight = 20;
+  const labelWidth = 220;
+  const valueWidth = pageWidth - margin * 2 - labelWidth;
+
+  drawSummaryRow('Metric', 'Value', labelWidth, valueWidth, summaryRowHeight, true, false);
+  summaryEntries.forEach(([key, value], index) => {
+    const label = key.replace(/_/g, ' ');
+    const displayValue = key.includes('date_range') ? formatDateShort(value) : (value ?? 'N/A');
+    drawSummaryRow(label, String(displayValue), labelWidth, valueWidth, summaryRowHeight, false, index % 2 === 0);
+  });
+  y += 50;
+
+  if (reportData.sensors && reportData.sensors.length) {
+    y += 26;
+    drawSectionTitle('Sensors');
+
+    if (report.report_type === 'analytics') {
+      const rowHeight = 20;
+      const analyticsLabelWidth = 180;
+      const analyticsValueWidth = pageWidth - margin * 2 - analyticsLabelWidth;
+
+      const drawSensorTable = (sensor) => {
+        const rows = [
+          ['Location', sensor.location ?? 'N/A'],
+          ['Status', sensor.status ?? 'N/A'],
+          ['Gateway', sensor.gateway_id ?? 'N/A'],
+          [
+            'Temp avg/min/max',
+            `${formatNumber2(sensor.avg_temp)} / ${formatNumber2(sensor.min_temp)} / ${formatNumber2(sensor.max_temp)}`
+          ],
+          [
+            'Humidity avg/min/max',
+            `${formatNumber2(sensor.avg_humidity)} / ${formatNumber2(sensor.min_humidity)} / ${formatNumber2(sensor.max_humidity)}`
+          ],
+          [
+            'Fruitfly total/avg/max',
+            `${sensor.fruitfly_total ?? 0} / ${formatNumber2(sensor.fruitfly_avg)} / ${formatNumber2(sensor.fruitfly_max)}`
+          ],
+          ['Readings', `${sensor.readings ?? 0}`],
+          ['Samples', `${sensor.fruitfly_samples ?? 0}`]
+        ];
+
+        const tableHeight = rows.length * rowHeight + 16;
+        addPageIfNeeded(tableHeight + 48);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(`#${sensor.sensor_id} ${sensor.name}`, margin, y);
+        y += 12;
+
+        const startY = y;
+        doc.setDrawColor(210);
+        doc.setFillColor(245, 247, 250);
+        doc.rect(margin, startY, analyticsLabelWidth, rowHeight, 'F');
+        doc.rect(margin + analyticsLabelWidth, startY, analyticsValueWidth, rowHeight, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.text('Metric', margin + 6, startY + 14);
+        doc.text('Value', margin + analyticsLabelWidth + 6, startY + 14);
+
+        y = startY + rowHeight;
+        doc.setFont('helvetica', 'normal');
+        rows.forEach(([label, value], index) => {
+          doc.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
+          doc.rect(margin, y, analyticsLabelWidth, rowHeight, 'F');
+          doc.rect(margin + analyticsLabelWidth, y, analyticsValueWidth, rowHeight, 'F');
+          doc.setDrawColor(220);
+          doc.rect(margin, y, analyticsLabelWidth, rowHeight);
+          doc.rect(margin + analyticsLabelWidth, y, analyticsValueWidth, rowHeight);
+          doc.text(String(label), margin + 6, y + 14);
+          doc.text(String(value), margin + analyticsLabelWidth + 6, y + 14);
+          y += rowHeight;
+        });
+
+        y += 26;
+      };
+
+      reportData.sensors.forEach(drawSensorTable);
+    } else {
+      const headers = ['Sensor', 'Status', 'Avg Temp', 'Avg Hum', 'Flies Total'];
+      const colWidths = [180, 70, 80, 80, 90];
+      const startX = margin;
+
+      const drawRow = (cells, bold = false) => {
+        addPageIfNeeded(lineHeight + 6);
+        let x = startX;
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        cells.forEach((cell, idx) => {
+          doc.text(String(cell), x, y);
+          x += colWidths[idx];
+        });
+        y += lineHeight;
+      };
+
+      drawRow(headers, true);
+      doc.setDrawColor(200);
+      doc.line(margin, y - 6, pageWidth - margin, y - 6);
+
+      reportData.sensors.forEach((sensor) => {
+        drawRow([
+          `#${sensor.sensor_id} ${sensor.name}`,
+          sensor.status ?? 'N/A',
+          sensor.avg_temp ?? 'N/A',
+          sensor.avg_humidity ?? 'N/A',
+          sensor.fruitfly_total ?? 0
+        ]);
+      });
+    }
+  }
+
+  return Buffer.from(doc.output('arraybuffer'));
+};
+
+const persistReportArtifacts = ({ filePath, reportData, report }) => {
+  const absolutePdfPath = getAbsoluteReportPath(filePath);
+  const absoluteSnapshotPath = getAbsoluteReportPath(getSnapshotPath(filePath));
+
+  ensureDirectory(path.dirname(absolutePdfPath));
+
+  const pdfBuffer = buildPdfBuffer({ report, reportData });
+  fs.writeFileSync(absolutePdfPath, pdfBuffer);
+  fs.writeFileSync(
+    absoluteSnapshotPath,
+    JSON.stringify(
+      {
+        report_type: report.report_type,
+        date_range_start: report.date_range_start,
+        date_range_end: report.date_range_end,
+        generated_at: new Date().toISOString(),
+        data: reportData
+      },
+      null,
+      2
+    )
+  );
+};
+
+const loadStoredReportData = async (report) => {
+  const snapshotPath = getAbsoluteReportPath(getSnapshotPath(report.file_path));
+
+  if (fs.existsSync(snapshotPath)) {
+    const raw = fs.readFileSync(snapshotPath, 'utf8');
+    return JSON.parse(raw).data;
+  }
+
+  return buildReportData({
+    userId: report.user_id,
+    reportType: report.report_type,
+    dateStart: report.date_range_start,
+    dateEnd: report.date_range_end
+  });
+};
+
 // Get all reports for user
 export const getReports = async (req, res) => {
   try {
@@ -117,7 +419,7 @@ export const getReports = async (req, res) => {
        FROM reports 
        WHERE user_id = ? 
        ORDER BY created_at DESC`,
-      [req.user.id]
+      [getOwnerUserId(req.user)]
     );
 
     res.json(reports);
@@ -147,19 +449,51 @@ export const generateReport = async (req, res) => {
     }
 
     const reportData = await buildReportData({
-      userId: req.user.id,
+      userId: getOwnerUserId(req.user),
       reportType: report_type,
       dateStart: date_range_start,
       dateEnd: date_range_end
     });
 
     const fileName = `report_${Date.now()}_${report_type}.pdf`;
-    const filePath = `/reports/${req.user.id}/${fileName}`;
+    const ownerUserId = getOwnerUserId(req.user);
+    const filePath = path.join('generated_reports', String(ownerUserId), fileName);
 
     const [result] = await pool.execute(
       'INSERT INTO reports (user_id, report_type, date_range_start, date_range_end, file_path) VALUES (?, ?, ?, ?, ?)',
-      [req.user.id, report_type, date_range_start, date_range_end, filePath]
+      [ownerUserId, report_type, date_range_start, date_range_end, filePath]
     );
+
+    try {
+      persistReportArtifacts({
+        filePath,
+        reportData,
+        report: {
+          id: result.insertId,
+          report_type,
+          date_range_start,
+          date_range_end
+        }
+      });
+    } catch (artifactError) {
+      await pool.execute('DELETE FROM reports WHERE id = ? AND user_id = ?', [result.insertId, ownerUserId]);
+      throw artifactError;
+    }
+
+    await logAuditEvent(pool, {
+      actorUserId: req.user.id,
+      action: 'report.generate',
+      entityType: 'report',
+      entityId: result.insertId,
+      details: {
+        ip_address: req.ip,
+        user_agent: req.get('user-agent') ?? null,
+        owner_user_id: ownerUserId,
+        report_type,
+        date_range_start,
+        date_range_end
+      }
+    });
 
     res.status(201).json({
       id: result.insertId,
@@ -178,7 +512,7 @@ export const downloadReport = async (req, res) => {
   try {
     const [reports] = await pool.execute(
       'SELECT * FROM reports WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, getOwnerUserId(req.user)]
     );
 
     if (reports.length === 0) {
@@ -186,62 +520,25 @@ export const downloadReport = async (req, res) => {
     }
 
     const report = reports[0];
-    const reportData = await buildReportData({
-      userId: req.user.id,
-      reportType: report.report_type,
-      dateStart: report.date_range_start,
-      dateEnd: report.date_range_end
-    });
+    const reportData = await loadStoredReportData(report);
 
     const format = String(req.query.format || 'json').toLowerCase();
     const baseName = `fruitfly_report_${report.id}_${report.report_type}`;
 
     if (format === 'csv') {
-      const summaryLines = Object.entries(reportData.summary ?? {}).map(
-        ([key, value]) => `${key},${value ?? ''}`
-      );
+      await logAuditEvent(pool, {
+        actorUserId: req.user.id,
+        action: 'report.download',
+        entityType: 'report',
+        entityId: report.id,
+        details: {
+          ip_address: req.ip,
+          user_agent: req.get('user-agent') ?? null,
+          format: 'csv'
+        }
+      });
 
-      let sensorLines = [];
-      if (reportData.sensors && reportData.sensors.length) {
-        const headers = [
-          'sensor_id',
-          'name',
-          'location',
-          'status',
-          'gateway_id',
-          'readings',
-          'avg_temp',
-          'min_temp',
-          'max_temp',
-          'avg_humidity',
-          'min_humidity',
-          'max_humidity',
-          'fruitfly_samples',
-          'fruitfly_total',
-          'fruitfly_avg',
-          'fruitfly_max'
-        ];
-
-        sensorLines = [
-          headers.join(','),
-          ...reportData.sensors.map((row) =>
-            headers.map((h) => {
-              const value = row[h];
-              if (value === null || value === undefined) return '';
-              const safe = String(value).replace(/"/g, '""');
-              return safe.includes(',') ? `"${safe}"` : safe;
-            }).join(',')
-          )
-        ];
-      }
-
-      const csv = [
-        'summary',
-        ...summaryLines,
-        '',
-        'sensors',
-        ...sensorLines
-      ].join('\n');
+      const csv = buildCsv(reportData);
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${baseName}.csv"`);
@@ -250,213 +547,45 @@ export const downloadReport = async (req, res) => {
     }
 
     if (format === 'pdf') {
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 40;
-      const lineHeight = 14;
-      let y = margin;
-
-      const addPageIfNeeded = (extra = lineHeight) => {
-        if (y + extra > pageHeight - margin) {
-          doc.addPage();
-          y = margin;
-        }
-      };
-
-      const drawSectionTitle = (title) => {
-        addPageIfNeeded(24);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text(title, margin, y);
-        y += 8;
-        doc.setDrawColor(180);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 12;
-        doc.setFont('helvetica', 'normal');
-      };
-
-      const formatDateShort = (value) => {
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return String(value ?? '');
-        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      };
-      const formatNumber2 = (value) => {
-        if (value === null || value === undefined || value === '') return 'N/A';
-        const num = Number(value);
-        if (Number.isNaN(num)) return String(value);
-        return num.toFixed(2);
-      };
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.text('FruitFly Farm Report', margin, y);
-      y += 22;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Report ID: ${report.id}`, margin, y);
-      y += lineHeight;
-      doc.text(`Type: ${report.report_type}`, margin, y);
-      y += lineHeight;
-      doc.setFillColor(238, 242, 255);
-      doc.setDrawColor(199, 210, 254);
-      doc.roundedRect(margin, y - 6, 260, 32, 6, 6, 'FD');
-      doc.setTextColor(30, 64, 175);
-      doc.text('Range', margin + 8, y + 6);
-      doc.text(
-        `${formatDateShort(report.date_range_start)} → ${formatDateShort(report.date_range_end)}`,
-        margin + 8,
-        y + 18
-      );
-      doc.setTextColor(0, 0, 0);
-      y += lineHeight * 5.6;
-
-      drawSectionTitle('Summary');
-      const summary = reportData.summary ?? {};
-      const summaryEntries = Object.entries(summary);
-      const summaryRowHeight = 20;
-      const labelWidth = 220;
-      const valueWidth = pageWidth - margin * 2 - labelWidth;
-
-      const drawSummaryRow = (label, value, isHeader = false, isStriped = false) => {
-        addPageIfNeeded(summaryRowHeight + 8);
-        if (isHeader) {
-          doc.setFillColor(245, 247, 250);
-          doc.rect(margin, y, labelWidth, summaryRowHeight, 'F');
-          doc.rect(margin + labelWidth, y, valueWidth, summaryRowHeight, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.text(label, margin + 6, y + 14);
-          doc.text(value, margin + labelWidth + 6, y + 14);
-        } else {
-          doc.setFillColor(isStriped ? 250 : 255, isStriped ? 252 : 255, isStriped ? 255 : 255);
-          doc.rect(margin, y, labelWidth, summaryRowHeight, 'F');
-          doc.rect(margin + labelWidth, y, valueWidth, summaryRowHeight, 'F');
-          doc.setDrawColor(220);
-          doc.rect(margin, y, labelWidth, summaryRowHeight);
-          doc.rect(margin + labelWidth, y, valueWidth, summaryRowHeight);
-          doc.setFont('helvetica', 'bold');
-          doc.text(label, margin + 6, y + 14);
-          doc.setFont('helvetica', 'normal');
-          doc.text(String(value), margin + labelWidth + 6, y + 14);
-        }
-        y += summaryRowHeight;
-      };
-
-      drawSummaryRow('Metric', 'Value', true, false);
-      summaryEntries.forEach((entry, index) => {
-        const [key, value] = entry;
-        const label = key.replace(/_/g, ' ');
-        const displayValue = key.includes('date_range')
-          ? formatDateShort(value)
-          : (value ?? 'N/A');
-        drawSummaryRow(label, String(displayValue), false, index % 2 === 0);
-      });
-      y += 50;
-
-      if (reportData.sensors && reportData.sensors.length) {
-        y += 26;
-        drawSectionTitle('Sensors');
-
-        if (report.report_type === 'analytics') {
-          const rowHeight = 20;
-          const labelWidth = 180;
-          const valueWidth = pageWidth - margin * 2 - labelWidth;
-
-          const drawSensorTable = (sensor) => {
-            const rows = [
-              ['Location', sensor.location ?? 'N/A'],
-              ['Status', sensor.status ?? 'N/A'],
-              ['Gateway', sensor.gateway_id ?? 'N/A'],
-              [
-                'Temp avg/min/max',
-                `${formatNumber2(sensor.avg_temp)} / ${formatNumber2(sensor.min_temp)} / ${formatNumber2(sensor.max_temp)}`
-              ],
-              [
-                'Humidity avg/min/max',
-                `${formatNumber2(sensor.avg_humidity)} / ${formatNumber2(sensor.min_humidity)} / ${formatNumber2(sensor.max_humidity)}`
-              ],
-              [
-                'Fruitfly total/avg/max',
-                `${sensor.fruitfly_total ?? 0} / ${formatNumber2(sensor.fruitfly_avg)} / ${formatNumber2(sensor.fruitfly_max)}`
-              ],
-              ['Readings', `${sensor.readings ?? 0}`],
-              ['Samples', `${sensor.fruitfly_samples ?? 0}`]
-            ];
-
-            const tableHeight = rows.length * rowHeight + 16;
-            addPageIfNeeded(tableHeight + 48);
-
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.text(`#${sensor.sensor_id} ${sensor.name}`, margin, y);
-            y += 12;
-
-            const startY = y;
-            doc.setDrawColor(210);
-            doc.setFillColor(245, 247, 250);
-            doc.rect(margin, startY, labelWidth, rowHeight, 'F');
-            doc.rect(margin + labelWidth, startY, valueWidth, rowHeight, 'F');
-            doc.setFont('helvetica', 'bold');
-            doc.text('Metric', margin + 6, startY + 14);
-            doc.text('Value', margin + labelWidth + 6, startY + 14);
-
-            y = startY + rowHeight;
-            doc.setFont('helvetica', 'normal');
-            rows.forEach(([label, value], index) => {
-              doc.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
-              doc.rect(margin, y, labelWidth, rowHeight, 'F');
-              doc.rect(margin + labelWidth, y, valueWidth, rowHeight, 'F');
-              doc.setDrawColor(220);
-              doc.rect(margin, y, labelWidth, rowHeight);
-              doc.rect(margin + labelWidth, y, valueWidth, rowHeight);
-              doc.text(String(label), margin + 6, y + 14);
-              doc.text(String(value), margin + labelWidth + 6, y + 14);
-              y += rowHeight;
-            });
-
-            y += 26;
-          };
-
-          reportData.sensors.forEach(drawSensorTable);
-        } else {
-          const headers = ['Sensor', 'Status', 'Avg Temp', 'Avg Hum', 'Flies Total'];
-          const colWidths = [180, 70, 80, 80, 90];
-          const startX = margin;
-
-          const drawRow = (cells, bold = false) => {
-            addPageIfNeeded(lineHeight + 6);
-            let x = startX;
-            doc.setFont('helvetica', bold ? 'bold' : 'normal');
-            cells.forEach((cell, idx) => {
-              doc.text(String(cell), x, y);
-              x += colWidths[idx];
-            });
-            y += lineHeight;
-          };
-
-          drawRow(headers, true);
-          doc.setDrawColor(200);
-          doc.line(margin, y - 6, pageWidth - margin, y - 6);
-
-          reportData.sensors.forEach((sensor) => {
-            drawRow([
-              `#${sensor.sensor_id} ${sensor.name}`,
-              sensor.status ?? 'N/A',
-              sensor.avg_temp ?? 'N/A',
-              sensor.avg_humidity ?? 'N/A',
-              sensor.fruitfly_total ?? 0
-            ]);
-          });
-        }
+      const absolutePdfPath = getAbsoluteReportPath(report.file_path);
+      if (!fs.existsSync(absolutePdfPath)) {
+        persistReportArtifacts({
+          filePath: report.file_path,
+          reportData,
+          report
+        });
       }
 
-      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${baseName}.pdf"`);
-      res.send(pdfBuffer);
+      await logAuditEvent(pool, {
+        actorUserId: req.user.id,
+        action: 'report.download',
+        entityType: 'report',
+        entityId: report.id,
+        details: {
+          ip_address: req.ip,
+          user_agent: req.get('user-agent') ?? null,
+          format: 'pdf'
+        }
+      });
+
+      res.download(absolutePdfPath, `${baseName}.pdf`);
       return;
     }
 
+    await logAuditEvent(pool, {
+      actorUserId: req.user.id,
+      action: 'report.download',
+      entityType: 'report',
+      entityId: report.id,
+      details: {
+        ip_address: req.ip,
+        user_agent: req.get('user-agent') ?? null,
+        format: 'json'
+      }
+    });
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${baseName}.json"`);
     res.json({
       message: 'Report ready',
       report,
@@ -487,7 +616,7 @@ export const getReportAvailability = async (req, res) => {
           WHERE s.user_id = ?
         ) AS dates
       `,
-      [req.user.id, req.user.id]
+      [getOwnerUserId(req.user), getOwnerUserId(req.user)]
     );
 
     const minDate = rows?.[0]?.min_date ?? null;

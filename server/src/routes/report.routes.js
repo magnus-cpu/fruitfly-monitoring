@@ -5,7 +5,7 @@ import {
   downloadReport,
   getReportAvailability
 } from '../controllers/report.controller.js';
-import { authenticateToken } from '../middleware/auth.middleware.js';
+import { authenticateToken, requireWritableFarmAccess } from '../middleware/auth.middleware.js';
 import {  validateReport } from '../validators/validator.js';
 const router = express.Router();
 
@@ -15,7 +15,7 @@ router.use(authenticateToken);
 // Report routes
 router.get('/availability', getReportAvailability);
 router.get('/', getReports);
-router.post('/', validateReport, generateReport);
+router.post('/', requireWritableFarmAccess, validateReport, generateReport);
 router.get('/:id/download', downloadReport);
 
 export default router;

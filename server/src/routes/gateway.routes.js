@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.middleware.js';
+import { authenticateToken, requireWritableFarmAccess } from '../middleware/auth.middleware.js';
 import { validateSensor } from '../validators/validator.js';
 import { createGateWay, deleteGateway, getAllGateways, getGatewayById, getGateways, getGatewaysData, updateGateway } from '../controllers/gateway.controller.js';
 
@@ -14,9 +14,9 @@ router.get('/', getGateways);
 // router.get('/:id', getGatewayById);
 router.get('/:id/data', getGatewaysData);
 
-router.post('/', validateSensor, createGateWay);
-router.put('/:id', validateSensor, updateGateway);
-router.delete('/:id', deleteGateway);
+router.post('/', requireWritableFarmAccess, validateSensor, createGateWay);
+router.put('/:id', requireWritableFarmAccess, validateSensor, updateGateway);
+router.delete('/:id', requireWritableFarmAccess, deleteGateway);
 
 
 export default router;

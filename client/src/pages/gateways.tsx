@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/Sapi';
 import { PageInfo, type ContentBlock } from '../components/PageInfo';
 import BackButton from '../components/BackButton';
+import { useAuth } from '../contexts/useAuth';
 
 interface Gateway {
   id: number;
@@ -42,6 +43,7 @@ interface Node {
 }
 
 const GateWays = () => {
+  const { user } = useAuth();
   // --- State Management ---
   const [gateways, setGateways] = useState<Gateway[]>([]);
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -79,6 +81,7 @@ const GateWays = () => {
     location_lat: '',
     location_lng: '',
   });
+  const isViewer = user?.role === 'viewer';
 
   // --- Data Fetching ---
   const fetchGateways = useCallback(async () => {
@@ -222,12 +225,20 @@ const GateWays = () => {
   }
 
   // --- Components ---
-  const StatusBadge: React.FC<{ status?: string }> = ({ status }) => (
-    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-      }`}>
-      {status || 'unknown'}
-    </span>
-  );
+  const StatusBadge: React.FC<{ status?: string }> = ({ status }) => {
+    let className = 'bg-gray-100 text-gray-600';
+
+    if (status === 'online') className = 'bg-green-100 text-green-700';
+    if (status === 'offline') className = 'bg-red-100 text-red-700';
+    if (status === 'maintenance') className = 'bg-amber-100 text-amber-700';
+    if (status === 'active') className = 'bg-green-100 text-green-700';
+
+    return (
+      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${className}`}>
+        {status || 'unknown'}
+      </span>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -239,15 +250,23 @@ const GateWays = () => {
             <h1 className="text-2xl font-bold text-slate-900 tracking-widest">Devices Management</h1>
             <p className="text-slate-500  mt-1">Monitor and manage your IoT Gateways and Nodes</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleOpenForm('gateway', 'create')}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-sm"
-            >
-              <Plus size={18} /> Add Gateway
-            </button>
-          </div>
+          {!isViewer && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleOpenForm('gateway', 'create')}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-sm"
+              >
+                <Plus size={18} /> Add Gateway
+              </button>
+            </div>
+          )}
         </div>
+
+        {isViewer && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Viewer mode is enabled for this account. You can inspect gateways and sensors, but only managers can create, edit, or delete them.
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Gateways Sidebar */}
@@ -317,20 +336,22 @@ const GateWays = () => {
                           </div>
 
                           {/* Edit/Delete Buttons */}
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleOpenForm('gateway', 'edit', gw); }}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-md border border-transparent hover:border-slate-200 shadow-sm"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDelete('gateway', gw.id); }}
-                              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-white rounded-md border border-transparent hover:border-slate-200 shadow-sm"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                          {!isViewer && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenForm('gateway', 'edit', gw); }}
+                                className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-md border border-transparent hover:border-slate-200 shadow-sm"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDelete('gateway', gw.id); }}
+                                className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-white rounded-md border border-transparent hover:border-slate-200 shadow-sm"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
 
                         </div>
                       </div>
@@ -358,12 +379,14 @@ const GateWays = () => {
                         <p className="text-slate-500 text-sm max-w-md">{selectedGateway!.description || 'No description provided.'}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleOpenForm('node', 'create')}
-                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                    >
-                      <Plus size={16} /> Register Node
-                    </button>
+                    {!isViewer && (
+                      <button
+                        onClick={() => handleOpenForm('node', 'create')}
+                        className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                      >
+                        <Plus size={16} /> Register Node
+                      </button>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100">
@@ -423,20 +446,22 @@ const GateWays = () => {
                           </div>
                           <div className="flex items-center gap-4">
                             <StatusBadge status={node.status} />
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleOpenForm('node', 'edit', node)}
-                                className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-white border border-transparent hover:border-slate-100"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete('node', node.id)}
-                                className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-white border border-transparent hover:border-slate-100"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
+                            {!isViewer && (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleOpenForm('node', 'edit', node)}
+                                  className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-white border border-transparent hover:border-slate-100"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete('node', node.id)}
+                                  className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-white border border-transparent hover:border-slate-100"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))

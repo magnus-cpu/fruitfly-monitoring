@@ -164,7 +164,7 @@ const Login: React.FC = () => {
               </form>
 
               <p className="mt-5 text-sm text-center text-slate-600">
-                Don&apos;t have an account?{' '}
+                Need a manager account?{' '}
                 <Link to="/register" className="text-emerald-700 hover:text-emerald-800 font-semibold">
                   Register here
                 </Link>

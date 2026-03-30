@@ -8,10 +8,25 @@ CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    role ENUM('admin', 'user') DEFAULT 'user',
+    role ENUM('admin', 'manager', 'viewer') DEFAULT 'manager',
+    manager_user_id INT NULL,
     password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (manager_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
+
+ALTER TABLE users
+    MODIFY COLUMN role ENUM('admin', 'user', 'manager', 'viewer') DEFAULT 'manager';
+
+UPDATE users
+SET role = 'manager'
+WHERE role = 'user';
+
+ALTER TABLE users
+    MODIFY COLUMN role ENUM('admin', 'manager', 'viewer') DEFAULT 'manager';
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS manager_user_id INT NULL AFTER role;
 
 -- 2. GATEWAYS Table
 -- The central communication hub. Linked to a user and has location data.
@@ -68,10 +83,22 @@ CREATE TABLE IF NOT EXISTS fruitfly_images (
     sensor_id INT NOT NULL,
     image_path VARCHAR(255) NOT NULL, -- Path or URL to the stored image file (e.g., in a cloud bucket)
     analysis_status ENUM('pending', 'analyzed', 'failed') DEFAULT 'pending',
+    analysis_notes TEXT NULL,
+    analyzed_at TIMESTAMP NULL DEFAULT NULL,
+    analyzed_by_user_id INT NULL,
     time_captured TIMESTAMP, -- When the image was captured
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE CASCADE
 );
+
+ALTER TABLE fruitfly_images
+    ADD COLUMN IF NOT EXISTS analysis_notes TEXT NULL AFTER analysis_status;
+
+ALTER TABLE fruitfly_images
+    ADD COLUMN IF NOT EXISTS analyzed_at TIMESTAMP NULL DEFAULT NULL AFTER analysis_notes;
+
+ALTER TABLE fruitfly_images
+    ADD COLUMN IF NOT EXISTS analyzed_by_user_id INT NULL AFTER analyzed_at;
 
 -- 4C. FRUITFLY_COUNTS Table
 -- Stores the fruit fly specific monitoring data, linked to the source image.
@@ -118,6 +145,21 @@ CREATE TABLE IF NOT EXISTS reports (
     file_path VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 5B. AUDIT_LOGS Table
+-- Stores audit events for sensitive user and admin actions.
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    actor_user_id INT NULL,
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(100) NULL,
+    details LONGTEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_audit_logs_action (action),
+    INDEX idx_audit_logs_created_at (created_at)
 );
 
 -- 6. CONTENT_BLOCKS Table

@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { basename, join } from 'path';
 import pool from '../config/database.js';
+import { getOwnerUserId } from '../services/access.service.js';
+import { logAuditEvent } from '../services/audit.service.js';
 
 const OUTPUT_DIR = 'uploaded_images';
 
@@ -85,8 +87,8 @@ export const processImageData = async (req, res) => {
 
 export const getFruitflyImages = async (req, res) => {
     try {
-        const userId = req.user?.id;
-        const { sensor_serial_number } = req.query;
+        const userId = getOwnerUserId(req.user);
+        const { sensor_serial_number, analysis_status } = req.query;
         const parsedLimit = Number(req.query.limit);
         const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
             ? Math.min(Math.trunc(parsedLimit), 200)
@@ -100,6 +102,11 @@ export const getFruitflyImages = async (req, res) => {
             params.push(sensor_serial_number);
         }
 
+        if (analysis_status && ['pending', 'analyzed', 'failed'].includes(analysis_status)) {
+            conditions.push('fi.analysis_status = ?');
+            params.push(analysis_status);
+        }
+
         const [rows] = await pool.execute(
             `SELECT
                 fi.id,
@@ -108,10 +115,15 @@ export const getFruitflyImages = async (req, res) => {
                 s.serial_number AS sensor_serial_number,
                 fi.image_path,
                 fi.analysis_status,
+                fi.analysis_notes,
+                fi.analyzed_at,
+                fi.analyzed_by_user_id,
                 fi.time_captured,
-                fi.created_at
+                fi.created_at,
+                fc.fruitfly_count
             FROM fruitfly_images fi
             INNER JOIN sensors s ON s.id = fi.sensor_id
+            LEFT JOIN fruitfly_counts fc ON fc.image_id = fi.id
             WHERE ${conditions.join(' AND ')}
             ORDER BY COALESCE(fi.time_captured, fi.created_at) DESC
             LIMIT ${limit}`,
@@ -138,3 +150,137 @@ export const getFruitflyImages = async (req, res) => {
     }
 };
 
+export const updateFruitflyImageAnalysis = async (req, res) => {
+    try {
+        const userId = getOwnerUserId(req.user);
+        const imageId = Number(req.params.id);
+        const allowedStatuses = ['pending', 'analyzed', 'failed'];
+        const requestedStatus = typeof req.body.analysis_status === 'string'
+            ? req.body.analysis_status.trim().toLowerCase()
+            : '';
+        const analysisNotes = typeof req.body.analysis_notes === 'string'
+            ? req.body.analysis_notes.trim().slice(0, 4000)
+            : null;
+
+        if (!Number.isInteger(imageId) || imageId <= 0) {
+            return res.status(400).json({
+                status: false,
+                message: 'Invalid image id'
+            });
+        }
+
+        if (!allowedStatuses.includes(requestedStatus)) {
+            return res.status(400).json({
+                status: false,
+                message: 'analysis_status must be pending, analyzed, or failed'
+            });
+        }
+
+        const [rows] = await pool.execute(
+            `SELECT fi.id
+             FROM fruitfly_images fi
+             INNER JOIN sensors s ON s.id = fi.sensor_id
+             WHERE fi.id = ? AND s.user_id = ?`,
+            [imageId, userId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                status: false,
+                message: 'Image not found'
+            });
+        }
+
+        const analyzedAt = requestedStatus === 'pending' ? null : new Date();
+        const analyzedByUserId = requestedStatus === 'pending' ? null : req.user.id;
+
+        await pool.execute(
+            `UPDATE fruitfly_images
+             SET analysis_status = ?, analysis_notes = ?, analyzed_at = ?, analyzed_by_user_id = ?
+             WHERE id = ?`,
+            [requestedStatus, analysisNotes, analyzedAt, analyzedByUserId, imageId]
+        );
+
+        await logAuditEvent(pool, {
+            actorUserId: req.user.id,
+            action: 'image.analyze',
+            entityType: 'fruitfly_image',
+            entityId: imageId,
+            details: {
+                analysis_status: requestedStatus,
+                analysis_notes: analysisNotes
+            }
+        });
+
+        res.json({
+            status: true,
+            message: 'Image analysis updated successfully'
+        });
+    } catch (error) {
+        console.error('Error updating fruitfly image analysis:', error);
+        res.status(500).json({
+            status: false,
+            message: 'Failed to update image analysis',
+            error: error.message
+        });
+    }
+};
+
+export const deleteFruitflyImage = async (req, res) => {
+    try {
+        const userId = getOwnerUserId(req.user);
+        const imageId = Number(req.params.id);
+
+        if (!Number.isInteger(imageId) || imageId <= 0) {
+            return res.status(400).json({
+                status: false,
+                message: 'Invalid image id'
+            });
+        }
+
+        const [rows] = await pool.execute(
+            `SELECT fi.id, fi.image_path
+             FROM fruitfly_images fi
+             INNER JOIN sensors s ON s.id = fi.sensor_id
+             WHERE fi.id = ? AND s.user_id = ?`,
+            [imageId, userId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                status: false,
+                message: 'Image not found'
+            });
+        }
+
+        const image = rows[0];
+
+        await pool.execute('DELETE FROM fruitfly_images WHERE id = ?', [imageId]);
+
+        if (image.image_path && existsSync(image.image_path)) {
+            unlinkSync(image.image_path);
+        }
+
+        await logAuditEvent(pool, {
+            actorUserId: req.user.id,
+            action: 'image.delete',
+            entityType: 'fruitfly_image',
+            entityId: imageId,
+            details: {
+                image_path: image.image_path
+            }
+        });
+
+        res.json({
+            status: true,
+            message: 'Image deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting fruitfly image:', error);
+        res.status(500).json({
+            status: false,
+            message: 'Failed to delete image',
+            error: error.message
+        });
+    }
+};

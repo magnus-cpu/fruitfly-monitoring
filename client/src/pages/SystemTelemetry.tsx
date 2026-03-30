@@ -11,6 +11,7 @@ import {
   YAxis
 } from 'recharts';
 import BackButton from '../components/BackButton';
+import { formatLocalDateTime, formatLocalTime } from '../utils/datetime';
 
 interface TelemetryRow {
   id: number;
@@ -38,33 +39,6 @@ interface GatewayOption {
   name: string;
   serial_number: string;
 }
-
-const DISPLAY_TZ_OFFSET_HOURS = 3;
-
-const parseDbTimestamp = (value: string | null) => {
-  if (!value) return { date: '-', time: '-', full: '-' };
-  const normalized = value.replace('T', ' ').replace('Z', '').split('.')[0];
-  const [datePart = '', timePart = '00:00:00'] = normalized.split(' ');
-  const [year, month, day] = datePart.split('-').map(Number);
-  const [hour = 0, minute = 0] = timePart.split(':').map(Number);
-
-  if (!year || !month || !day) return { date: '-', time: '-', full: '-' };
-
-  const utcMs = Date.UTC(year, month - 1, day, hour, minute);
-  const shifted = new Date(utcMs + DISPLAY_TZ_OFFSET_HOURS * 60 * 60 * 1000);
-
-  const yyyy = shifted.getUTCFullYear();
-  const mm = String(shifted.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(shifted.getUTCDate()).padStart(2, '0');
-  const hh = String(shifted.getUTCHours()).padStart(2, '0');
-  const min = String(shifted.getUTCMinutes()).padStart(2, '0');
-
-  return {
-    date: `${yyyy}-${mm}-${dd}`,
-    time: `${hh}:${min}`,
-    full: `${yyyy}-${mm}-${dd} ${hh}:${min}`
-  };
-};
 
 const formatValue = (value: number | null, suffix: string) =>
   value === null || value === undefined ? 'N/A' : `${value}${suffix}`;
@@ -149,8 +123,8 @@ const SystemTelemetry: React.FC = () => {
       [...rows]
         .reverse()
         .map((row) => ({
-          timeLabel: parseDbTimestamp(row.time_taken ?? row.created_at).time,
-          fullDate: parseDbTimestamp(row.time_taken ?? row.created_at).full,
+          timeLabel: formatLocalTime(row.time_taken ?? row.created_at),
+          fullDate: formatLocalDateTime(row.time_taken ?? row.created_at),
           voltage: row.voltage,
           current: row.current,
           power: row.power,
@@ -359,7 +333,7 @@ const SystemTelemetry: React.FC = () => {
                       {row.sensor_name ?? row.gateway_name ?? 'Unknown'}
                     </span>
                     <span className="text-xs text-slate-500">
-                      {parseDbTimestamp(row.time_taken ?? row.created_at).full}
+                      {formatLocalDateTime(row.time_taken ?? row.created_at)}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">

@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { getOwnerUserId } from '../services/access.service.js';
 
 const REFERENCE_VOLTAGE = 5;
 
@@ -160,7 +161,7 @@ export const storeSystemTelemetry = async (req, res) => {
 
 export const getSystemTelemetry = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = getOwnerUserId(req.user);
     const { sensor_serial_number, gateway_serial_number } = req.query;
     const parsedLimit = Number(req.query.limit);
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0

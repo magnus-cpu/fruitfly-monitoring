@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/Sapi';
 import { useAuth } from '../contexts/useAuth';
 import BackButton from '../components/BackButton';
@@ -115,6 +116,14 @@ const AdminContent: React.FC = () => {
           <BackButton className="mb-3" />
           <h1 className="text-2xl font-bold text-slate-900">Content Manager</h1>
           <p className="text-slate-500 mt-1">Edit guidance text shown on dashboard, reports, sensors, and gateways.</p>
+          <div className="mt-3">
+            <Link
+              to="/admin"
+              className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-indigo-400"
+            >
+              Back To Admin Dashboard
+            </Link>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

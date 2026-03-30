@@ -1,5 +1,7 @@
 import pool from '../config/database.js';
 import { validationResult } from 'express-validator';
+import { getOwnerUserId } from '../services/access.service.js';
+import { logAuditEvent } from '../services/audit.service.js';
 
 
 // Helper function to generate node serial number based on gateway
@@ -60,7 +62,7 @@ export const createNode = async (req, res) => {
     // Verify gateway exists and belongs to user
     const [gatewayRows] = await pool.execute(
       'SELECT id FROM gateways WHERE id = ? AND user_id = ?',
-      [gateway_id, req.user.id]
+      [gateway_id, getOwnerUserId(req.user)]
     );
 
     if (gatewayRows.length === 0) {
@@ -75,8 +77,23 @@ export const createNode = async (req, res) => {
 
     const [result] = await pool.execute(
       'INSERT INTO sensors (name, serial_number, gateway_id, location, location_lat, location_lng, description, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, serial_number, gateway_id, location, location_lat, location_lng, description, req.user.id]
+      [name, serial_number, gateway_id, location, location_lat, location_lng, description, getOwnerUserId(req.user)]
     );
+
+    await logAuditEvent(pool, {
+      actorUserId: req.user.id,
+      action: 'sensor.create',
+      entityType: 'sensor',
+      entityId: result.insertId,
+      details: {
+        ip_address: req.ip,
+        user_agent: req.get('user-agent') ?? null,
+        owner_user_id: getOwnerUserId(req.user),
+        gateway_id,
+        name,
+        serial_number
+      }
+    });
 
     res.status(201).json({
       status: true,
@@ -120,12 +137,26 @@ export const updateNode = async (req, res) => {
 
     const [result] = await pool.execute(
       'UPDATE sensors SET name = ?, description = ?, location = ?, location_lat = ?, location_lng = ? WHERE id = ? AND user_id = ?',
-      [name, description, location, location_lat, location_lng, req.params.id, req.user.id]
+      [name, description, location, location_lat, location_lng, req.params.id, getOwnerUserId(req.user)]
     );
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Sensor not found' });
     }
+
+    await logAuditEvent(pool, {
+      actorUserId: req.user.id,
+      action: 'sensor.update',
+      entityType: 'sensor',
+      entityId: req.params.id,
+      details: {
+        ip_address: req.ip,
+        user_agent: req.get('user-agent') ?? null,
+        owner_user_id: getOwnerUserId(req.user),
+        name,
+        location
+      }
+    });
 
     res.json({ message: 'Sensor updated successfully' });
   } catch (error) {
@@ -139,12 +170,24 @@ export const deleteNode = async (req, res) => {
   try {
     const [result] = await pool.execute(
       'DELETE FROM sensors WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, getOwnerUserId(req.user)]
     );
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Sensor not found' });
     }
+
+    await logAuditEvent(pool, {
+      actorUserId: req.user.id,
+      action: 'sensor.delete',
+      entityType: 'sensor',
+      entityId: req.params.id,
+      details: {
+        ip_address: req.ip,
+        user_agent: req.get('user-agent') ?? null,
+        owner_user_id: getOwnerUserId(req.user)
+      }
+    });
 
     res.json({ message: 'Sensor deleted successfully' });
   } catch (error) {
@@ -160,7 +203,7 @@ export const getSensors = async (req, res) => {
   try {
     const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE user_id = ? ORDER BY created_at DESC',
-      [req.user.id]
+      [getOwnerUserId(req.user)]
     );
 
     res.json(sensors);
@@ -175,7 +218,7 @@ export const getNodeSensors = async (req, res) => {
   try {
     const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE user_id = ? AND gateway_id = ? ORDER BY created_at DESC',
-      [req.user.id, req.params.id]
+      [getOwnerUserId(req.user), req.params.id]
     );
 
     res.json(sensors);
@@ -204,7 +247,7 @@ export const getSensorById = async (req, res) => {
   try {
     const [sensors] = await pool.execute(
       'SELECT id, name, serial_number, description, location, location_lat, location_lng, status, created_at FROM sensors WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, getOwnerUserId(req.user)]
     );
 
     if (sensors.length === 0) {

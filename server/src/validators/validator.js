@@ -23,14 +23,20 @@ const passwordChain = (field = 'password') =>
 
 const roleChain = () =>
   body('role')
-    .isIn(['user', 'admin'])
-    .withMessage("Role must be either 'user' or 'admin'");
+    .isIn(['manager', 'admin'])
+    .withMessage("Role must be either 'manager' or 'admin'");
 
 const idChain = (name = 'id') =>
   param(name).isInt({ min: 1 }).withMessage(`${name} must be a positive integer`);
 
 /* ---------------- User routes ---------------- */
 export const validateRegister = [
+  usernameChain(),
+  emailChain(),
+  passwordChain()
+];
+
+export const validateCreateViewer = [
   usernameChain(),
   emailChain(),
   passwordChain()

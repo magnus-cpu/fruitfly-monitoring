@@ -33,6 +33,12 @@ import type { Environmental, Fruitfly, Gateway, Sensor } from '../types/sensorTy
 import { EnvTable } from '../components/EnvTable';
 import { FruitflyTable } from '../components/FruitflyTable';
 import { PageInfo, type ContentBlock } from '../components/PageInfo';
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+  getAppTimestamp,
+  parseAppDate
+} from '../utils/datetime';
 
 
 // --- Interfaces ---
@@ -99,8 +105,15 @@ const Sensors: React.FC = () => {
     () =>
       [...fruitflyData].reverse().map(f => ({
         fruitfly_count: f.fruitfly_count,
-        displayTime: new Date(f.time_taken).toLocaleDateString([], { month: 'short', day: 'numeric' }),
-        fullDate: new Date(f.time_taken).toLocaleString([], { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }),
+        displayTime: formatLocalDate(f.time_taken, { month: 'short', day: 'numeric' }),
+        fullDate: formatLocalDateTime(f.time_taken, {
+          weekday: 'short',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
       })),
     [fruitflyData]
   );
@@ -110,8 +123,15 @@ const Sensors: React.FC = () => {
       [...envData].reverse().map(e => ({
         temperature: e.temperature,
         humidity: e.humidity,
-        displayTime: new Date(e.time_taken).toLocaleDateString([], { month: 'short', day: 'numeric' }),
-        fullDate: new Date(e.time_taken).toLocaleString([], { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }),
+        displayTime: formatLocalDate(e.time_taken, { month: 'short', day: 'numeric' }),
+        fullDate: formatLocalDateTime(e.time_taken, {
+          weekday: 'short',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
       })),
     [envData]
   );
@@ -207,8 +227,8 @@ const Sensors: React.FC = () => {
     if (!envData.length) return null;
     return [...envData].sort(
       (a, b) =>
-        new Date(b.time_taken).getTime() -
-        new Date(a.time_taken).getTime()
+        getAppTimestamp(b.time_taken) -
+        getAppTimestamp(a.time_taken)
     )[0];
   }, [envData]);
 
@@ -216,23 +236,27 @@ const Sensors: React.FC = () => {
     if (!fruitflyData.length) return null;
     return [...fruitflyData].sort(
       (a, b) =>
-        new Date(b.time_taken).getTime() -
-        new Date(a.time_taken).getTime()
+        getAppTimestamp(b.time_taken) -
+        getAppTimestamp(a.time_taken)
     )[0];
   }, [fruitflyData]);
 
   const latestUpdatedAt = useMemo(() => {
     const envTime =
       envData.length > 0
-        ? new Date(
-          Math.max(...envData.map(e => new Date(e.time_taken).getTime()))
+        ? parseAppDate(
+          new Date(
+            Math.max(...envData.map(e => getAppTimestamp(e.time_taken)))
+          )
         )
         : null;
 
     const fruitflyTime =
       fruitflyData.length > 0
-        ? new Date(
-          Math.max(...fruitflyData.map(f => new Date(f.time_taken).getTime()))
+        ? parseAppDate(
+          new Date(
+            Math.max(...fruitflyData.map(f => getAppTimestamp(f.time_taken)))
+          )
         )
         : null;
 
@@ -558,7 +582,7 @@ const Sensors: React.FC = () => {
                         <Clock size={12} />
                         Updated:{' '}
                         {latestUpdatedAt
-                          ? latestUpdatedAt.toLocaleString()
+                          ? formatLocalDateTime(latestUpdatedAt)
                           : 'Waiting for data...'}
                       </div>
                     </div>

@@ -125,8 +125,8 @@ const Register: React.FC = () => {
           <div className="w-full max-w-md">
             <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-slate-200 p-8">
               <div className="mb-6">
-                <h2 className="text-3xl font-bold">Create your account</h2>
-                <p className="text-sm text-slate-600 mt-1">Start monitoring your orchard today.</p>
+                <h2 className="text-3xl font-bold">Create manager account</h2>
+                <p className="text-sm text-slate-600 mt-1">Managers can register devices and invite read-only viewer accounts later.</p>
               </div>
 
               {error && (

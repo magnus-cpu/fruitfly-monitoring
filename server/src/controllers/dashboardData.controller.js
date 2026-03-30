@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { getOwnerUserId } from '../services/access.service.js';
 
 /* Get a union data of cordinates for 
  gateway-parrent and all of its nodes/childrens
@@ -6,7 +7,7 @@ import pool from '../config/database.js';
 */
 export const getLocations = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = getOwnerUserId(req.user);
 
     const sql = `
       SELECT

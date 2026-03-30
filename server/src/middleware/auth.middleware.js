@@ -12,6 +12,9 @@ export const authenticateToken = (req, res, next) => {
     if (err) {
       return res.status(403).json({ message: 'Invalid or expired token' });
     }
+    if (user?.role === 'user') {
+      user.role = 'manager';
+    }
     req.user = user;
     next();
   });
@@ -19,9 +22,11 @@ export const authenticateToken = (req, res, next) => {
 
 export const authorizeRoles = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    const normalizedRole = req.user?.role === 'user' ? 'manager' : req.user?.role;
+
+    if (!roles.includes(normalizedRole)) {
       return res.status(403).json({ 
-        message: `Role ${req.user.role} is not allowed to access this resource` 
+        message: `Role ${normalizedRole} is not allowed to access this resource`
       });
     }
     next();
@@ -30,3 +35,13 @@ export const authorizeRoles = (...roles) => {
 
 // src/middleware/auth.middleware.js
 export const requireAdmin = authorizeRoles('admin');
+export const requireManager = authorizeRoles('manager');
+export const requireWritableFarmAccess = (req, res, next) => {
+  if (req.user?.role === 'viewer') {
+    return res.status(403).json({
+      message: 'Viewer accounts have read-only access to farm data'
+    });
+  }
+
+  next();
+};

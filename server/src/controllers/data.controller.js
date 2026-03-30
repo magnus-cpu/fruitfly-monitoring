@@ -1,13 +1,15 @@
 import pool from '../config/database.js';
+import { getOwnerUserId } from '../services/access.service.js';
 
 // Get env data
 export const getEnvironmentalData = async (req, res) => {
   try {
+    const ownerUserId = getOwnerUserId(req.user);
     // GET sensor id from serial_number
     const [sensorRows] = await pool.execute
       (
-        'SELECT id FROM sensors WHERE serial_number = ?',
-        [req.params.serial_number]
+        'SELECT id FROM sensors WHERE serial_number = ? AND user_id = ?',
+        [req.params.serial_number, ownerUserId]
       );
 
 
@@ -39,7 +41,7 @@ export const getEnvironmentalData = async (req, res) => {
 // Get combined env + counts data
 export const getCombinedData = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = getOwnerUserId(req.user);
     const { serial_number } = req.params;
 
     // 1️⃣ Validate sensor ownership

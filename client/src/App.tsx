@@ -12,9 +12,11 @@ import MapView from './pages/MapView';
 import Profile from './pages/Profile';
 import GateWays from './pages/gateways';
 import AdminContent from './pages/AdminContent';
+import AdminDashboard from './pages/AdminDashboard';
 import Footer from './components/Footer';
 import SystemTelemetry from './pages/SystemTelemetry';
 import FruitflyImages from './pages/FruitflyImages';
+import DataView from './pages/DataView';
 
 function App() {
   return (
@@ -40,6 +42,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/sensors"
+              element={
+                <ProtectedRoute>
+                  <DataView />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/data" element={<Navigate to="/sensors" replace />} />
             <Route
               path="/profile"
               element={
@@ -85,6 +96,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <FruitflyImages />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />

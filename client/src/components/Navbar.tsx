@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Map, BarChart3, FileText, LogOut, User, Menu, X, Activity, ImageIcon, LayoutDashboard } from 'lucide-react';
+import { Map, BarChart3, FileText, LogOut, User, Menu, X, Activity, ImageIcon, LayoutDashboard, Shield, Database } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 
 const Navbar: React.FC = () => {
@@ -21,6 +21,7 @@ const Navbar: React.FC = () => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/map', label: 'Map', icon: Map },
+    { path: '/sensors', label: 'Sensors', icon: Database },
     { path: '/gateways', label: 'Gateways', icon: BarChart3 },
     { path: '/system-telemetry', label: 'Telemetry', icon: Activity },
     { path: '/fruitfly-images', label: 'Images', icon: ImageIcon },
@@ -28,7 +29,10 @@ const Navbar: React.FC = () => {
   ];
 
   const adminItems = user?.role === 'admin'
-    ? [{ path: '/admin/content', label: 'Content', icon: FileText }]
+    ? [
+      { path: '/admin', label: 'Admin', icon: Shield },
+      { path: '/admin/content', label: 'Content', icon: FileText }
+    ]
     : [];
 
   return (
