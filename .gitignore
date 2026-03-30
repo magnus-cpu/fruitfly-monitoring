@@ -138,4 +138,4 @@ out
 .pnp.*
 
 uploaded_images
-generated_reports
+/server/generated_reports/

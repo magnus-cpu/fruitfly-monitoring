@@ -7,7 +7,7 @@
     "summary": {
       "date_range_start": "2026-02-12",
       "date_range_end": "2026-03-30",
-      "sensors_total": 6,
+      "sensors_total": 8,
       "sensors_active": 6,
       "sensors_inactive": 0,
       "gateways_total": 2,
