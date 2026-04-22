@@ -16,6 +16,41 @@ interface SensorData {
     cpu_temp?: number;
     created_at?: string;
     time_taken?: string;
+    telemetry_created_at?: string;
+    telemetry_time_taken?: string;
+    telemetry_source?: 'sensor' | 'gateway';
+}
+
+interface SensorLookup {
+    id: number;
+    serial_number: string;
+    gateway_serial_number?: string;
+}
+
+interface EnvironmentalRow {
+    temperature?: number;
+    humidity?: number;
+    created_at?: string;
+    time_taken?: string;
+}
+
+interface FruitflyCountRow {
+    fruitfly_count?: number;
+    created_at?: string;
+    time_taken?: string;
+}
+
+interface TelemetryRow {
+    power?: number | null;
+    cpu_temp?: number | null;
+    created_at?: string;
+    time_taken?: string | null;
+}
+
+interface CombinedSensorData {
+    environmental?: EnvironmentalRow[];
+    fruitfly?: FruitflyCountRow[];
+    telemetry?: TelemetryRow[];
 }
 
 interface SensorProperties {
@@ -29,6 +64,14 @@ interface SensorProperties {
     temp?: number;
     humidity?: number;
     insects?: number;
+    power?: number | null;
+    cpu_temp?: number | null;
+    telemetry_time_taken?: string | null;
+    telemetry_created_at?: string | null;
+    gateway_power?: number | null;
+    gateway_cpu_temp?: number | null;
+    gateway_telemetry_time_taken?: string | null;
+    gateway_telemetry_created_at?: string | null;
     activity_status?: 'active' | 'inactive' | string;
 }
 
@@ -99,9 +142,37 @@ const FlyToSelected: React.FC<{ point: [number, number] | null }> = ({ point }) 
     return null;
 };
 
+const formatMetric = (value: number | null | undefined, suffix = '') =>
+    value === null || value === undefined ? 'N/A' : `${value}${suffix}`;
+
+const buildLatestSensorData = (
+    combinedData: CombinedSensorData | null | undefined,
+    fallbackTelemetry?: TelemetryRow | null
+): SensorData | null => {
+    const latestEnv = combinedData?.environmental?.[0] ?? null;
+    const latestCount = combinedData?.fruitfly?.[0] ?? null;
+    const latestTelemetry = combinedData?.telemetry?.[0] ?? fallbackTelemetry ?? null;
+
+    return latestEnv || latestCount || latestTelemetry
+        ? {
+            temperature: latestEnv?.temperature,
+            humidity: latestEnv?.humidity,
+            fruitfly_count: latestCount?.fruitfly_count,
+            power: latestTelemetry?.power ?? undefined,
+            cpu_temp: latestTelemetry?.cpu_temp ?? undefined,
+            created_at: latestEnv?.created_at || latestCount?.created_at,
+            time_taken: latestEnv?.time_taken || latestCount?.time_taken,
+            telemetry_created_at: latestTelemetry?.created_at,
+            telemetry_time_taken: latestTelemetry?.time_taken ?? undefined,
+            telemetry_source: fallbackTelemetry ? 'gateway' : latestTelemetry ? 'sensor' : undefined
+        }
+        : null;
+};
+
 const MapView: React.FC = () => {
     const [geoData, setGeoData] = useState<GeoJSONData | null>(null);
     const [latestBySensor, setLatestBySensor] = useState<Record<number, SensorData | null>>({});
+    const [latestByGateway, setLatestByGateway] = useState<Record<number, TelemetryRow | null>>({});
     const [selectedPoint, setSelectedPoint] = useState<[number, number] | null>(null);
     const navigate = useNavigate();
 
@@ -117,32 +188,73 @@ const MapView: React.FC = () => {
         loadLocations();
     }, []);
 
-    const refreshLatest = useCallback(async (sensorList: Array<{ serial_number: string }>) => {
+    const refreshLatest = useCallback(async (sensorList: SensorLookup[]) => {
         return Promise.all(
             sensorList.map(async (sensor) => {
                 try {
                     const combinedResponse = await api.get(`/fruitfly/${sensor.serial_number}/combined_data`);
-                    const latestEnv = combinedResponse.data?.environmental?.[0] ?? null;
-                    const latestCount = combinedResponse.data?.fruitfly?.[0] ?? null;
-                    const latestTelemetry = combinedResponse.data?.telemetry?.[0] ?? null;
-                    const latest = latestEnv || latestCount
-                        ? {
-                            temperature: latestEnv?.temperature,
-                            humidity: latestEnv?.humidity,
-                            fruitfly_count: latestCount?.fruitfly_count,
-                            power: latestTelemetry?.power,
-                            cpu_temp: latestTelemetry?.cpu_temp,
-                            created_at: latestEnv?.created_at || latestCount?.created_at,
-                            time_taken: latestEnv?.time_taken || latestCount?.time_taken
-                        }
-                        : null;
-                    return [sensor.serial_number, latest] as const;
+                    const latest = buildLatestSensorData(combinedResponse.data);
+                    return [sensor.id, latest] as const;
                 } catch (error) {
                     console.error(`Failed to load data for sensor ${sensor.serial_number}`, error);
-                    return [sensor.serial_number, null] as const;
+                    return [sensor.id, null] as const;
                 }
             })
         );
+    }, []);
+
+    const refreshSensorLatest = useCallback(async (sensor: SensorLookup) => {
+        let latest: SensorData | null = null;
+
+        try {
+            const combinedResponse = await api.get(`/fruitfly/${sensor.serial_number}/combined_data`);
+            const hasSensorTelemetry = Boolean(combinedResponse.data?.telemetry?.[0]);
+            let fallbackTelemetry: TelemetryRow | null = null;
+
+            if (!hasSensorTelemetry && sensor.gateway_serial_number) {
+                try {
+                    const telemetryResponse = await api.get('/device/system-telemetry', {
+                        params: {
+                            gateway_serial_number: sensor.gateway_serial_number,
+                            limit: 1
+                        }
+                    });
+                    fallbackTelemetry = telemetryResponse.data?.rows?.[0] ?? null;
+                } catch (error) {
+                    console.error(`Failed to load gateway telemetry for ${sensor.gateway_serial_number}`, error);
+                }
+            }
+
+            latest = buildLatestSensorData(combinedResponse.data, fallbackTelemetry);
+        } catch (error) {
+            console.error(`Failed to refresh latest data for sensor ${sensor.serial_number}`, error);
+        }
+
+        setLatestBySensor((current) => ({
+            ...current,
+            [sensor.id]: latest
+        }));
+    }, []);
+
+    const refreshGatewayLatest = useCallback(async (gateway: SensorLookup) => {
+        let latest: TelemetryRow | null = null;
+
+        try {
+            const telemetryResponse = await api.get('/device/system-telemetry', {
+                params: {
+                    gateway_serial_number: gateway.serial_number,
+                    limit: 1
+                }
+            });
+            latest = telemetryResponse.data?.rows?.[0] ?? null;
+        } catch (error) {
+            console.error(`Failed to load gateway telemetry for ${gateway.serial_number}`, error);
+        }
+
+        setLatestByGateway((current) => ({
+            ...current,
+            [gateway.id]: latest
+        }));
     }, []);
 
     useEffect(() => {
@@ -155,7 +267,9 @@ const MapView: React.FC = () => {
         const fetchLatest = async () => {
             const entries = await refreshLatest(
                 sensorFeatures.map(f => ({
-                    serial_number: f.properties.serial_number
+                    id: f.properties.id,
+                    serial_number: f.properties.serial_number,
+                    gateway_serial_number: f.properties.gateway_serial_number
                 }))
             );
             if (!cancelled) {
@@ -220,12 +334,32 @@ const MapView: React.FC = () => {
                     const latest = properties.entity === 'sensor'
                         ? latestBySensor[properties.id] ?? null
                         : null;
+                    const gatewayTelemetry = properties.entity === 'gateway'
+                        ? latestByGateway[properties.id] ?? null
+                        : null;
                     const status = properties.activity_status ?? 'inactive';
                     const temp = latest?.temperature ?? properties.temp;
                     const hum = latest?.humidity ?? properties.humidity;
                     const insects = latest?.fruitfly_count ?? properties.insects;
-                    const power = latest?.power;
-                    const cpuTemp = latest?.cpu_temp;
+                    const power = latest?.power ?? properties.power ?? properties.gateway_power;
+                    const cpuTemp = latest?.cpu_temp ?? properties.cpu_temp ?? properties.gateway_cpu_temp;
+                    const readingUpdatedAt = latest?.time_taken ?? latest?.created_at;
+                    const telemetryUpdatedAt = latest?.telemetry_time_taken
+                        ?? latest?.telemetry_created_at
+                        ?? properties.telemetry_time_taken
+                        ?? properties.telemetry_created_at
+                        ?? properties.gateway_telemetry_time_taken
+                        ?? properties.gateway_telemetry_created_at;
+                    const gatewayTelemetryUpdatedAt = gatewayTelemetry?.time_taken
+                        ?? gatewayTelemetry?.created_at
+                        ?? properties.telemetry_time_taken
+                        ?? properties.telemetry_created_at;
+                    const telemetrySource = latest?.telemetry_source
+                        ?? (properties.power !== undefined && properties.power !== null
+                            ? 'sensor'
+                            : properties.gateway_power !== undefined && properties.gateway_power !== null
+                                ? 'gateway'
+                                : undefined);
                     const icon = properties.entity === 'gateway'
                         ? gatewayIcon
                         : (status === 'active' ? activeIcon : inactiveIcon);
@@ -236,6 +370,20 @@ const MapView: React.FC = () => {
                             icon={icon}
                             eventHandlers={{
                                 click: () => setSelectedPoint([geometry.coordinates[1], geometry.coordinates[0]]),
+                                popupopen: () => {
+                                    if (properties.entity === 'sensor') {
+                                        refreshSensorLatest({
+                                            id: properties.id,
+                                            serial_number: properties.serial_number,
+                                            gateway_serial_number: properties.gateway_serial_number
+                                        });
+                                    } else if (properties.entity === 'gateway') {
+                                        refreshGatewayLatest({
+                                            id: properties.id,
+                                            serial_number: properties.serial_number
+                                        });
+                                    }
+                                },
                             }}
                         >
                             <Popup>
@@ -260,6 +408,13 @@ const MapView: React.FC = () => {
                                         <div className="mt-2 space-y-2">
                                             <p className="text-xs text-slate-600">Gateway node</p>
                                             <p className="text-xs text-slate-500">Gateway Serial: {properties.serial_number ?? 'N/A'}</p>
+                                            <div className="text-xs text-slate-600 space-y-1.5">
+                                                <div><span className="font-semibold text-slate-700">Power:</span> {formatMetric(gatewayTelemetry?.power ?? properties.power, 'W')}</div>
+                                                <div><span className="font-semibold text-slate-700">CPU Temp:</span> {formatMetric(gatewayTelemetry?.cpu_temp ?? properties.cpu_temp, '°C')}</div>
+                                                {gatewayTelemetryUpdatedAt ? (
+                                                    <div><span className="font-semibold text-slate-700">Telemetry updated:</span> {formatLocalDateTime(gatewayTelemetryUpdatedAt)}</div>
+                                                ) : null}
+                                            </div>
                                             <button
                                                 onClick={() => navigate(`/gateways/${properties.id}/sensors`)}
                                                 className="mt-1 inline-flex items-center justify-center w-full text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 px-2 py-1.5 rounded-md transition-colors"
@@ -272,14 +427,22 @@ const MapView: React.FC = () => {
                                             <div className="text-xs text-slate-600 mt-2 space-y-1.5">
                                                 <div><span className="font-semibold text-slate-700">Serial:</span> {properties.serial_number ?? 'N/A'}</div>
                                                 <div><span className="font-semibold text-slate-700">Gateway Serial:</span> {properties.gateway_serial_number ?? 'N/A'}</div>
-                                                <div><span className="font-semibold text-slate-700">Temperature:</span> {temp ?? 'N/A'}°C</div>
-                                                <div><span className="font-semibold text-slate-700">Humidity:</span> {hum ?? 'N/A'}%</div>
-                                                <div><span className="font-semibold text-slate-700">Insects:</span> {insects ?? 0}</div>
-                                                <div><span className="font-semibold text-slate-700">Power:</span> {power ?? 'N/A'}W</div>
-                                                <div><span className="font-semibold text-slate-700">CPU Temp:</span> {cpuTemp ?? 'N/A'}°C</div>
+                                                <div><span className="font-semibold text-slate-700">Temperature:</span> {formatMetric(temp, '°C')}</div>
+                                                <div><span className="font-semibold text-slate-700">Humidity:</span> {formatMetric(hum, '%')}</div>
+                                                <div><span className="font-semibold text-slate-700">Insects:</span> {insects ?? 'N/A'}</div>
+                                                <div><span className="font-semibold text-slate-700">Power:</span> {formatMetric(power, 'W')}</div>
+                                                <div><span className="font-semibold text-slate-700">CPU Temp:</span> {formatMetric(cpuTemp, '°C')}</div>
                                                 <div><span className="font-semibold text-slate-700">Coordinates:</span> {geometry.coordinates[1].toFixed(5)}, {geometry.coordinates[0].toFixed(5)}</div>
-                                                {(latest?.time_taken || latest?.created_at) ? (
-                                                    <div><span className="font-semibold text-slate-700">Updated:</span> {formatLocalDateTime(latest.time_taken ?? latest.created_at)}</div>
+                                                {readingUpdatedAt ? (
+                                                    <div><span className="font-semibold text-slate-700">Reading updated:</span> {formatLocalDateTime(readingUpdatedAt)}</div>
+                                                ) : null}
+                                                {telemetryUpdatedAt ? (
+                                                    <div>
+                                                        <span className="font-semibold text-slate-700">
+                                                            {telemetrySource === 'gateway' ? 'Gateway telemetry updated:' : 'Telemetry updated:'}
+                                                        </span>{' '}
+                                                        {formatLocalDateTime(telemetryUpdatedAt)}
+                                                    </div>
                                                 ) : null}
                                             </div>
                                             {properties.gateway_id ? (

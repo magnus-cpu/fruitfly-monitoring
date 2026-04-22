@@ -23,7 +23,11 @@ const buildLocationResponse = (rows) => {
           name: row.gateway_name,
           serial_number: row.gateway_serial_number,
           location: row.gateway_location,
-          entity: 'gateway'
+          entity: 'gateway',
+          power: row.gateway_power,
+          cpu_temp: row.gateway_cpu_temp,
+          telemetry_time_taken: row.gateway_telemetry_time_taken,
+          telemetry_created_at: row.gateway_telemetry_created_at
         }
       });
     }
@@ -38,17 +42,25 @@ const buildLocationResponse = (rows) => {
             Number(row.sensor_lat)
           ]
         },
-          properties: {
-            id: row.sensor_id,
-            name: row.sensor_name,
-            serial_number: row.serial_number,
-            location: row.sensor_location,
-            entity: 'sensor',
-            gateway_id: row.gateway_id,
-            gateway_serial_number: row.gateway_serial_number,
-            temp: row.temperature,
-            humidity: row.humidity,
-            insects: row.fruitfly_count,
+        properties: {
+          id: row.sensor_id,
+          name: row.sensor_name,
+          serial_number: row.serial_number,
+          location: row.sensor_location,
+          entity: 'sensor',
+          gateway_id: row.gateway_id,
+          gateway_serial_number: row.gateway_serial_number,
+          temp: row.temperature,
+          humidity: row.humidity,
+          insects: row.fruitfly_count,
+          power: row.sensor_power,
+          cpu_temp: row.sensor_cpu_temp,
+          telemetry_time_taken: row.sensor_telemetry_time_taken,
+          telemetry_created_at: row.sensor_telemetry_created_at,
+          gateway_power: row.gateway_power,
+          gateway_cpu_temp: row.gateway_cpu_temp,
+          gateway_telemetry_time_taken: row.gateway_telemetry_time_taken,
+          gateway_telemetry_created_at: row.gateway_telemetry_created_at,
           activity_status: row.sensor_status
         }
       });
@@ -86,7 +98,15 @@ export const getLocations = async (req, res) => {
           s.status AS sensor_status,
           (SELECT temperature FROM environmental_readings WHERE sensor_id = s.id ORDER BY created_at DESC LIMIT 1) AS temperature,
           (SELECT humidity FROM environmental_readings WHERE sensor_id = s.id ORDER BY created_at DESC LIMIT 1) AS humidity,
-          (SELECT fruitfly_count FROM fruitfly_counts WHERE sensor_id = s.id ORDER BY created_at DESC LIMIT 1) AS fruitfly_count
+          (SELECT fruitfly_count FROM fruitfly_counts WHERE sensor_id = s.id ORDER BY created_at DESC LIMIT 1) AS fruitfly_count,
+          (SELECT power FROM system_telemetry WHERE sensor_id = s.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS sensor_power,
+          (SELECT cpu_temp FROM system_telemetry WHERE sensor_id = s.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS sensor_cpu_temp,
+          (SELECT time_taken FROM system_telemetry WHERE sensor_id = s.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS sensor_telemetry_time_taken,
+          (SELECT created_at FROM system_telemetry WHERE sensor_id = s.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS sensor_telemetry_created_at,
+          (SELECT power FROM system_telemetry WHERE gateway_id = g.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS gateway_power,
+          (SELECT cpu_temp FROM system_telemetry WHERE gateway_id = g.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS gateway_cpu_temp,
+          (SELECT time_taken FROM system_telemetry WHERE gateway_id = g.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS gateway_telemetry_time_taken,
+          (SELECT created_at FROM system_telemetry WHERE gateway_id = g.id ORDER BY COALESCE(time_taken, created_at) DESC LIMIT 1) AS gateway_telemetry_created_at
       FROM gateways g
       LEFT JOIN sensors s ON s.gateway_id = g.id
       WHERE g.user_id = ?
