@@ -62,10 +62,21 @@ app.use(
   })
 );
 
+const deviceIngestPaths = new Set([
+  '/api/device/env-data',
+  '/api/device/counts-data',
+  '/api/device/image-data',
+  '/api/device/telemetry-data'
+]);
+
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 20 * 1000, // 15 minutes
-  max: 1000 // limit each IP to 100 requests per windowMs
+  windowMs: 20 * 1000,
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  skip: (req) => {
+    const path = req.originalUrl.split('?')[0];
+    return req.method === 'POST' && deviceIngestPaths.has(path);
+  }
 });
 app.use('/api/', limiter);
 

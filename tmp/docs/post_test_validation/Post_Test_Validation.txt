@@ -1,0 +1,43 @@
+﻿Part II: Validation Questions
+    1. How do you rate each of the following statements about the ability of the proposed intelligent fruit fly trap to fulfil the functional requirements? (Please tick the appropriate option with the scale of 1 = Very low, 2 = Low, 3 = Average, 4 = High, 5 = Very High).
+SN	Validation criteria statements for functional requirements	1	2	3	4	5
+1	Fruit fly detection and counting					
+2	Image acquisition					
+3	Data transmission					
+4	Edge inference					
+5	Power monitoring and management					
+6	Data storage					
+7	Remote monitoring and visualization					
+
+    2. How do you rate each of the following statements about the ability of the proposed intelligent fruit fly trap to fulfil the non-functional requirements? (Please tick the appropriate option with the scale of 1 = Very low, 2 = Low, 3 = Average, 4 = High, 5 = Very High).
+SN	Validation criteria statements for non-functional requirements	1	2	3	4	5
+1	Accuracy					
+2	Latency					
+3	Energy efficiency					
+4	Reliability					
+5	Scalability					
+6	Robustness					
+7	Maintainability					
+
+    3. How do you rate each of the following statements about the ability of the remote monitoring and visualization to fulfil the functional requirements? (Please tick the appropriate option with the scale of 1 = Very low, 2 = Low, 3 = Average, 4 = High, 5 = Very High).
+SN	Validation criteria statements for functional requirements	1	2	3	4	5
+1	Data reception					
+2	Data storage and management					
+3	Visualization dashboard					
+4	Image visualization					
+5	Alerts and notifications					
+6	User and access management					
+7	Data export and reporting					
+
+
+    4. How do you rate each of the following statements about the ability of the remote monitoring and visualization to fulfil the non-functional requirements? (Please tick the appropriate option with the scale of 1 = Very low, 2 = Low, 3 = Average, 4 = High, 5 = Very High).
+SN	Validation criteria statements for non-functional requirements	1	2	3	4	5
+1	Usability					
+2	Performance					
+3	Scalability					
+4	Reliability and availability					
+5	Security and privacy					
+6	Interoperability					
+7	Maintainability					
+8	Cost efficiency					
+
