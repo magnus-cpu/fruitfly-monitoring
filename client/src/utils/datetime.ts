@@ -1,6 +1,22 @@
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const HAS_TIMEZONE_PATTERN = /([zZ]|[+-]\d{2}:\d{2})$/;
 
+const normalizeTimestampForDisplay = (value: string): string => {
+  const trimmed = value.trim();
+
+  if (DATE_ONLY_PATTERN.test(trimmed)) {
+    return `${trimmed}T00:00:00`;
+  }
+
+  let normalized = trimmed.replace(' ', 'T');
+
+  if (!normalized.includes('T')) {
+    normalized = `${normalized}T00:00:00`;
+  }
+
+  return normalized.replace(HAS_TIMEZONE_PATTERN, '');
+};
+
 export const parseAppDate = (
   value: string | Date | null | undefined
 ): Date | null => {
@@ -13,17 +29,7 @@ export const parseAppDate = (
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  let normalized = trimmed;
-
-  if (DATE_ONLY_PATTERN.test(trimmed)) {
-    normalized = `${trimmed}T00:00:00`;
-  } else if (!HAS_TIMEZONE_PATTERN.test(trimmed)) {
-    normalized = trimmed.replace(' ', 'T');
-    if (!normalized.includes('T')) {
-      normalized = `${normalized}T00:00:00`;
-    }
-  }
-
+  const normalized = normalizeTimestampForDisplay(trimmed);
   const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
